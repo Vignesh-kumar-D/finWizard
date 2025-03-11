@@ -5,11 +5,10 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from './config';
 import {
-  signUpWithEmail,
-  signInWithEmail,
   signInWithGoogle,
   signOutUser,
-  resetPassword,
+  initPhoneAuth,
+  verifyOtpAndSignIn,
   getCurrentUserProfile,
 } from './utils/auth';
 import { UserProfile } from '@/types';
@@ -18,15 +17,14 @@ interface FirebaseContextType {
   currentUser: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
-  signUp: (
-    email: string,
-    password: string,
-    name: string
-  ) => Promise<UserProfile>;
-  login: (email: string, password: string) => Promise<User>;
   loginWithGoogle: () => Promise<User>;
   logout: () => Promise<void>;
-  resetUserPassword: (email: string) => Promise<void>;
+  initiatePhoneLogin: (phoneNumber: string) => Promise<string>;
+  verifyOtp: (
+    verificationId: string,
+    otp: string,
+    userName?: string
+  ) => Promise<UserProfile>;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(
@@ -69,14 +67,6 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, name: string) => {
-    return signUpWithEmail(email, password, name);
-  };
-
-  const login = async (email: string, password: string) => {
-    return signInWithEmail(email, password);
-  };
-
   const loginWithGoogle = async () => {
     return signInWithGoogle();
   };
@@ -85,19 +75,26 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({
     return signOutUser();
   };
 
-  const resetUserPassword = async (email: string) => {
-    return resetPassword(email);
+  const initiatePhoneLogin = async (phoneNumber: string) => {
+    return initPhoneAuth(phoneNumber);
+  };
+
+  const verifyOtp = async (
+    verificationId: string,
+    otp: string,
+    userName?: string
+  ) => {
+    return verifyOtpAndSignIn(verificationId, otp, userName);
   };
 
   const value = {
     currentUser,
     userProfile,
     loading,
-    signUp,
-    login,
     loginWithGoogle,
     logout,
-    resetUserPassword,
+    initiatePhoneLogin,
+    verifyOtp,
   };
 
   return (

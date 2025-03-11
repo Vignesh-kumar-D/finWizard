@@ -1,79 +1,15 @@
 // utils/auth.ts
 import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
-  sendPasswordResetEmail,
   GoogleAuthProvider,
-  updateProfile,
+  PhoneAuthProvider,
+  signInWithCredential,
+  RecaptchaVerifier,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config';
 import { UserProfile } from '@/types';
-
-// Sign up with email and password
-export const signUpWithEmail = async (
-  email: string,
-  password: string,
-  displayName: string
-): Promise<UserProfile> => {
-  try {
-    // Create user in Firebase Auth
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-    const user = userCredential.user;
-
-    // Update the user's display name
-    await updateProfile(user, { displayName });
-
-    // Create user profile in Firestore
-    const userProfile: Omit<UserProfile, 'id'> = {
-      name: displayName,
-      email: user.email!,
-      phoneNumber: user.phoneNumber || '',
-      createdAt: Date.now(),
-      lastActive: Date.now(),
-      photoURL: user.photoURL || '',
-    };
-
-    await setDoc(doc(db, 'users', user.uid), userProfile);
-
-    // Return the user profile
-    return {
-      id: user.uid,
-      ...userProfile,
-    };
-  } catch (error) {
-    const err = error as Error;
-    console.error('Error signing up:', err.message);
-    throw err;
-  }
-};
-
-// Sign in with email and password
-export const signInWithEmail = async (email: string, password: string) => {
-  try {
-    const userCredential = await signInWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-
-    // Update last active timestamp
-    const userRef = doc(db, 'users', userCredential.user.uid);
-    await setDoc(userRef, { lastActive: Date.now() }, { merge: true });
-
-    return userCredential.user;
-  } catch (error) {
-    const err = error as Error;
-    console.error('Error signing in:', err.message);
-    throw err;
-  }
-};
 
 // Sign in with Google
 export const signInWithGoogle = async () => {
@@ -111,6 +47,91 @@ export const signInWithGoogle = async () => {
   }
 };
 
+// Initialize phone authentication
+export const initPhoneAuth = async (phoneNumber: string): Promise<string> => {
+  try {
+    // Create a recaptcha verifier
+    const recaptchaVerifier = new RecaptchaVerifier(
+      auth,
+      'recaptcha-container',
+      {
+        size: 'invisible',
+      }
+    );
+
+    // Send verification code
+    const phoneProvider = new PhoneAuthProvider(auth);
+    const verificationId = await phoneProvider.verifyPhoneNumber(
+      phoneNumber,
+      recaptchaVerifier
+    );
+
+    // Store verification ID in session storage for safety
+    sessionStorage.setItem('verificationId', verificationId);
+
+    return verificationId;
+  } catch (error) {
+    console.error('Error initializing phone auth:', error);
+    throw error;
+  }
+};
+
+// Verify OTP and sign in
+export const verifyOtpAndSignIn = async (
+  verificationId: string,
+  otp: string,
+  userName?: string
+): Promise<UserProfile> => {
+  try {
+    // Create credential
+    const credential = PhoneAuthProvider.credential(verificationId, otp);
+
+    // Sign in with credential
+    const userCredential = await signInWithCredential(auth, credential);
+    const firebaseUser = userCredential.user;
+
+    // Check if user already exists in Firestore
+    const userRef = doc(db, 'users', firebaseUser.uid);
+    const userDoc = await getDoc(userRef);
+
+    let userProfile: UserProfile;
+
+    if (!userDoc.exists()) {
+      // This is a new user, create a profile
+      const newUserProfile: Omit<UserProfile, 'id'> = {
+        name:
+          userName ||
+          `User_${phoneNumberToUsername(firebaseUser.phoneNumber || '')}`,
+        email: firebaseUser.email || '',
+        phoneNumber: firebaseUser.phoneNumber || '',
+        createdAt: Date.now(),
+        lastActive: Date.now(),
+        photoURL: firebaseUser.photoURL || '',
+      };
+
+      await setDoc(userRef, newUserProfile);
+
+      userProfile = {
+        id: firebaseUser.uid,
+        ...newUserProfile,
+      };
+    } else {
+      // Existing user, update last active timestamp
+      await setDoc(userRef, { lastActive: Date.now() }, { merge: true });
+
+      userProfile = {
+        id: userDoc.id,
+        ...(userDoc.data() as Omit<UserProfile, 'id'>),
+      };
+    }
+
+    return userProfile;
+  } catch (error) {
+    console.error('Error verifying OTP:', error);
+    throw error;
+  }
+};
+
 // Sign out
 export const signOutUser = async () => {
   try {
@@ -118,17 +139,6 @@ export const signOutUser = async () => {
   } catch (error) {
     const err = error as Error;
     console.error('Error signing out:', err.message);
-    throw error;
-  }
-};
-
-// Reset password
-export const resetPassword = async (email: string) => {
-  try {
-    await sendPasswordResetEmail(auth, email);
-  } catch (error) {
-    const err = error as Error;
-    console.error('Error resetting password:', err.message);
     throw error;
   }
 };
@@ -155,3 +165,10 @@ export const getCurrentUserProfile = async (
     throw error;
   }
 };
+
+// Helper function to convert phone number to username
+function phoneNumberToUsername(phoneNumber: string): string {
+  // Remove all non-digit characters and take the last 6 digits
+  const digits = phoneNumber.replace(/\D/g, '');
+  return digits.slice(-6);
+}

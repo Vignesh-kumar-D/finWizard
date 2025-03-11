@@ -1,8 +1,9 @@
 // tailwind.config.js
 import * as animate from 'tailwindcss-animate';
-/** @type {import('tailwindcss').Config} */
+import type { Config } from 'tailwindcss';
+
 module.exports = {
-  darkMode: ['class'],
+  darkMode: 'class',
   content: [
     './pages/**/*.{ts,tsx}',
     './components/**/*.{ts,tsx}',
@@ -18,6 +19,9 @@ module.exports = {
       },
     },
     extend: {
+      backgroundColor: {
+        background: 'white',
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -52,6 +56,20 @@ module.exports = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        // Financial-themed colors for charts and graphs
+        income: 'hsl(var(--income))',
+        expense: 'hsl(var(--expense))',
+        savings: 'hsl(var(--savings))',
+        investment: 'hsl(var(--investment))',
+        budget: 'hsl(var(--budget))',
+        // Chart colors
+        chart: {
+          1: 'hsl(var(--chart-1))',
+          2: 'hsl(var(--chart-2))',
+          3: 'hsl(var(--chart-3))',
+          4: 'hsl(var(--chart-4))',
+          5: 'hsl(var(--chart-5))',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -60,19 +78,65 @@ module.exports = {
       },
       keyframes: {
         'accordion-down': {
-          from: { height: 0 },
+          from: { height: '0' },
           to: { height: 'var(--radix-accordion-content-height)' },
         },
         'accordion-up': {
           from: { height: 'var(--radix-accordion-content-height)' },
-          to: { height: 0 },
+          to: { height: '0' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-1000px 0' },
+          '100%': { backgroundPosition: '1000px 0' },
+        },
+        fadeIn: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        slideIn: {
+          from: { transform: 'translateY(20px)', opacity: '0' },
+          to: { transform: 'translateY(0)', opacity: '1' },
         },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        shimmer: 'shimmer 2s infinite linear',
+        fadeIn: 'fadeIn 0.5s ease-out',
+        slideIn: 'slideIn 0.5s ease-out',
+      },
+      boxShadow: {
+        'card-hover':
+          '0 10px 15px -3px rgba(var(--primary-rgb)/0.1), 0 4px 6px -4px rgba(var(--primary-rgb)/0.1)',
+        soft: '0 2px 10px rgba(0, 0, 0, 0.05)',
+      },
+      typography: {
+        DEFAULT: {
+          css: {
+            maxWidth: '65ch',
+            color: 'hsl(var(--foreground))',
+            a: {
+              color: 'hsl(var(--primary))',
+              '&:hover': {
+                color: 'hsl(var(--primary)/0.8)',
+              },
+            },
+            h1: {
+              color: 'hsl(var(--foreground))',
+            },
+            h2: {
+              color: 'hsl(var(--foreground))',
+            },
+            h3: {
+              color: 'hsl(var(--foreground))',
+            },
+            h4: {
+              color: 'hsl(var(--foreground))',
+            },
+          },
+        },
       },
     },
   },
   plugins: [animate],
-};
+} satisfies Config;

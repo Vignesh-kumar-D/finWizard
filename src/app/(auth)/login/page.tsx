@@ -1,311 +1,357 @@
+// app/auth/page.tsx
 'use client';
 
-// app/(auth)/login/page.tsx
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useFirebase } from '@/lib/firebase/firebase-context';
+import Link from 'next/link';
+import { z } from 'zod';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { useFirebase } from '@/lib/firebase/firebase-context';
+import {
+  PhoneIcon,
+  ArrowRightIcon,
+  CheckIcon,
+  KeyIcon,
+  UserIcon,
+} from 'lucide-react';
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+// Form validation schemas
+const phoneSchema = z.object({
+  phoneNumber: z.string().min(10, 'Enter a valid phone number').max(15),
+});
 
-  const { login, loginWithGoogle, signUp, resetUserPassword } = useFirebase();
+const otpSchema = z.object({
+  otp: z.string().min(6, 'OTP must be 6 digits').max(6),
+});
+
+const nameSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
+});
+
+export default function AuthPage() {
   const router = useRouter();
+  const { loginWithGoogle, initiatePhoneLogin, verifyOtp } = useFirebase();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Form states
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otp, setOtp] = useState('');
+  const [userName, setUserName] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [verificationId, setVerificationId] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-    if (!email || !password) {
-      toast.error('Please enter both email and password.');
-      return;
+  // Format phone number
+  const formatPhoneNumber = (value: string) => {
+    // Remove non-digit characters
+    const phoneDigits = value.replace(/\D/g, '');
+
+    // Make sure it starts with + if there's content
+    if (phoneDigits.length > 0) {
+      return `+${phoneDigits}`;
     }
-
-    setIsLoading(true);
-
-    try {
-      await login(email, password);
-      router.push('/dashboard');
-    } catch {
-      toast.error('Login failed');
-    } finally {
-      setIsLoading(false);
-    }
+    return '';
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  // Handle phone number change
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhoneNumber(formatPhoneNumber(e.target.value));
+  };
+
+  // Handle send OTP
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!email || !password || !name) {
-      toast.error('Please fill in all fields.');
-      return;
-    }
-
-    setIsLoading(true);
+    setLoading(true);
+    setErrors({});
 
     try {
-      await signUp(email, password, name);
-      toast.success('Account created', {
-        description: 'Your account has been created successfully.',
+      // Validate phone number
+      phoneSchema.parse({ phoneNumber });
+
+      // Send OTP
+      const verId = await initiatePhoneLogin(phoneNumber);
+      setVerificationId(verId);
+
+      setOtpSent(true);
+      setIsNewUser(true); // We'll determine this during verification
+
+      toast.success('OTP sent to your phone', {
+        description: 'Please enter the verification code you received',
       });
-      router.push('/dashboard');
-    } catch {
-      toast.error('Sign up failed');
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const formattedErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            formattedErrors[err.path[0].toString()] = err.message;
+          }
+        });
+        setErrors(formattedErrors);
+      } else if (error instanceof Error) {
+        toast.error('Failed to send OTP', {
+          description:
+            error.message || 'Something went wrong. Please try again.',
+        });
+      }
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
+  // Handle verify OTP
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrors({});
 
+    try {
+      // Validate OTP
+      otpSchema.parse({ otp });
+
+      if (isNewUser && userName) {
+        // Validate name for new users
+        nameSchema.parse({ name: userName });
+      }
+
+      // Verify OTP
+      await verifyOtp(verificationId, otp, isNewUser ? userName : undefined);
+
+      toast.success(
+        isNewUser ? 'Account created successfully!' : 'Welcome back!',
+        {
+          description: "You've successfully logged in",
+        }
+      );
+      router.push('/dashboard');
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const formattedErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            formattedErrors[err.path[0].toString()] = err.message;
+          }
+        });
+        setErrors(formattedErrors);
+      } else if (error instanceof Error) {
+        toast.error('Failed to verify OTP', {
+          description: error.message || 'Invalid OTP. Please try again.',
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Google login
+  const handleGoogleLogin = async () => {
+    setLoading(true);
     try {
       await loginWithGoogle();
+      toast.success("Welcome! You've successfully logged in with Google.");
       router.push('/dashboard');
-    } catch {
-      toast.error('Google login failed');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (!email) {
-      toast.error('Please enter your email address.');
-      return;
-    }
-
-    try {
-      await resetUserPassword(email);
-      toast.success('Password reset email sent', {
-        description: 'Please check your email to reset your password.',
+    } catch (error) {
+      toast.error('Login failed', {
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
       });
-    } catch {
-      toast.error('Password reset failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex h-screen justify-center items-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            Finance Tracker
-          </CardTitle>
-          <CardDescription className="text-center">
-            Manage your personal finances with ease
-          </CardDescription>
-        </CardHeader>
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Left side decorative panel */}
+      <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-primary/90 to-primary-foreground p-12 items-center justify-center">
+        <div className="max-w-md mx-auto text-center">
+          <h1 className="text-4xl font-bold mb-6 text-white">
+            Budget Smarter, Live Better
+          </h1>
+          <p className="text-lg text-white/80 mb-8">
+            Take control of your financial journey with our personal finance
+            app. Track expenses, set budgets, and reach your financial goals.
+          </p>
+          <div className="relative h-64 w-full rounded-xl overflow-hidden shadow-2xl">
+            {/* Replace with your app screenshot or illustration */}
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center">
+              <span className="text-white text-xl font-medium">
+                App Preview
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="signup">Sign Up</TabsTrigger>
-          </TabsList>
+      {/* Right side auth forms */}
+      <div className="flex-1 p-6 md:p-12 flex items-center justify-center">
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold tracking-tight">
+              Welcome to FinanceTrack
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              Your personal finance journey starts here
+            </p>
+          </div>
 
-          <TabsContent value="login">
-            <form onSubmit={handleLogin}>
-              <CardContent className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
+          <Tabs defaultValue="phone" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="phone">Phone Login</TabsTrigger>
+              <TabsTrigger value="google">Google Login</TabsTrigger>
+            </TabsList>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="password">Password</Label>
+            <TabsContent value="phone" className="space-y-6">
+              {!otpSent ? (
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">Phone Number</Label>
+                    <div className="relative">
+                      <Input
+                        id="phoneNumber"
+                        type="tel"
+                        placeholder="+1234567890"
+                        value={phoneNumber}
+                        onChange={handlePhoneChange}
+                        className={`pl-10 ${
+                          errors.phoneNumber ? 'border-red-500' : ''
+                        }`}
+                      />
+                      <PhoneIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    </div>
+                    {errors.phoneNumber && (
+                      <p className="text-sm text-red-500">
+                        {errors.phoneNumber}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Please enter your phone number with country code (e.g., +1
+                      for USA)
+                    </p>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? 'Sending OTP...' : 'Send OTP'}
+                    <ArrowRightIcon className="ml-2 h-4 w-4" />
+                  </Button>
+
+                  {/* Invisible reCAPTCHA container */}
+                  <div id="recaptcha-container"></div>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="otp">Verification Code</Label>
+                    <div className="relative">
+                      <Input
+                        id="otp"
+                        type="text"
+                        placeholder="123456"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value)}
+                        className={`pl-10 ${
+                          errors.otp ? 'border-red-500' : ''
+                        }`}
+                        maxLength={6}
+                      />
+                      <KeyIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    </div>
+                    {errors.otp && (
+                      <p className="text-sm text-red-500">{errors.otp}</p>
+                    )}
+                  </div>
+
+                  {isNewUser && (
+                    <div className="space-y-2">
+                      <Label htmlFor="userName">Your Name</Label>
+                      <div className="relative">
+                        <Input
+                          id="userName"
+                          type="text"
+                          placeholder="John Doe"
+                          value={userName}
+                          onChange={(e) => setUserName(e.target.value)}
+                          className={`pl-10 ${
+                            errors.name ? 'border-red-500' : ''
+                          }`}
+                        />
+                        <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      </div>
+                      {errors.name && (
+                        <p className="text-sm text-red-500">{errors.name}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Please provide your name for your new account
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center">
                     <button
                       type="button"
-                      onClick={handleResetPassword}
                       className="text-xs text-primary hover:underline"
+                      onClick={() => setOtpSent(false)}
                     >
-                      Forgot password?
+                      Change number
                     </button>
                   </div>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-              </CardContent>
 
-              <CardFooter className="flex flex-col space-y-4">
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Logging in...' : 'Login'}
-                </Button>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? 'Verifying...' : 'Verify & Continue'}
+                    <CheckIcon className="ml-2 h-4 w-4" />
+                  </Button>
+                </form>
+              )}
+            </TabsContent>
 
-                <div className="relative w-full">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-gray-300" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      Or continue with
-                    </span>
-                  </div>
-                </div>
-
+            <TabsContent value="google" className="space-y-6">
+              <div className="text-center p-6">
+                <p className="mb-4">
+                  Sign in with your Google account quickly and securely
+                </p>
                 <Button
                   type="button"
-                  variant="outline"
                   className="w-full"
                   onClick={handleGoogleLogin}
-                  disabled={isLoading}
+                  disabled={loading}
                 >
-                  <svg
-                    className="mr-2 h-4 w-4"
-                    aria-hidden="true"
-                    focusable="false"
-                    data-prefix="fab"
-                    data-icon="google"
-                    role="img"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 488 512"
-                  >
+                  <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                     <path
-                      fill="currentColor"
-                      d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
-                    ></path>
-                  </svg>
-                  Google
-                </Button>
-              </CardFooter>
-            </form>
-          </TabsContent>
-
-          <TabsContent value="signup">
-            <form onSubmit={handleSignUp}>
-              <CardContent className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Enter your name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="signup-password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Create a password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      fill="#4285F4"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Password must be at least 6 characters long
-                  </p>
-                </div>
-              </CardContent>
-
-              <CardFooter className="flex flex-col space-y-4">
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Creating account...' : 'Create account'}
-                </Button>
-
-                <div className="relative w-full">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-gray-300" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      Or continue with
-                    </span>
-                  </div>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleGoogleLogin}
-                  disabled={isLoading}
-                >
-                  <svg
-                    className="mr-2 h-4 w-4"
-                    aria-hidden="true"
-                    focusable="false"
-                    data-prefix="fab"
-                    data-icon="google"
-                    role="img"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 488 512"
-                  >
                     <path
-                      fill="currentColor"
-                      d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
-                    ></path>
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      fill="#34A853"
+                    />
+                    <path
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      fill="#FBBC05"
+                    />
+                    <path
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      fill="#EA4335"
+                    />
                   </svg>
-                  Google
+                  {loading ? 'Signing in...' : 'Sign in with Google'}
                 </Button>
-              </CardFooter>
-            </form>
-          </TabsContent>
-        </Tabs>
-      </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="mt-6 text-center text-sm">
+            <Link href="/" className="text-primary hover:underline">
+              Return to Home
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
