@@ -1,12 +1,11 @@
-// app/(protected)/budget/new/page.tsx
 import BudgetForm from '@/components/account/BudgetForm';
 import { Card, CardContent } from '@/components/ui/card';
 
-export default function CreateBudgetPage() {
+export default function EditBudgetPage({ params }: { params: { id: string } }) {
   return (
     <Card>
       <CardContent className="pt-6">
-        <BudgetForm />
+        <BudgetForm budgetId={params.id} />
       </CardContent>
     </Card>
   );
