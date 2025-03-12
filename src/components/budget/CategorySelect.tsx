@@ -19,10 +19,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Category } from '@/types';
 import { toast } from 'sonner';
 import { createCategory } from '@/lib/firebase/utils/category';
 import { useFirebase } from '@/lib/firebase/firebase-context';
+import * as lucideIcons from 'lucide-react';
 
 // List of preset colors to choose from
 const COLORS = [
@@ -46,36 +48,49 @@ const COLORS = [
   '#607D8B',
 ];
 
-// List of preset icons to choose from
-const ICONS = [
-  'shopping-bag',
-  'food',
-  'home',
-  'car',
-  'bus',
-  'film',
-  'coffee',
-  'gift',
-  'heart',
-  'book',
-  'droplet',
-  'zap',
-  'dollar-sign',
-  'credit-card',
-  'smartphone',
-  'wifi',
-  'tv',
-  'globe',
-  'briefcase',
-  'users',
-];
+// List of preset icons to choose from with actual Lucide icons
+const ICON_NAMES = [
+  'ShoppingBag',
+  'Utensils',
+  'Home',
+  'Car',
+  'Bus',
+  'Film',
+  'Coffee',
+  'Gift',
+  'Heart',
+  'Book',
+  'Droplet',
+  'Zap',
+  'DollarSign',
+  'CreditCard',
+  'Smartphone',
+  'Wifi',
+  'Tv',
+  'Globe',
+  'Briefcase',
+  'Users',
+  'Calendar',
+  'Plane',
+  'Train',
+  'School',
+  'Backpack',
+  'Wallet',
+  'ShoppingCart',
+  'Building',
+] as const;
+
+// Get actual icon components from Lucide
+const ICONS = ICON_NAMES.map((name) => ({
+  name,
+  component: lucideIcons[name],
+}));
 
 interface CategorySelectProps {
   value: string;
   onChange: (value: string) => void;
   categories: Category[];
   type: 'expense' | 'income' | 'investment';
-  refreshCategories: () => Promise<void>;
 }
 
 export function CategorySelect({
@@ -92,10 +107,16 @@ export function CategorySelect({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Form state for new category
-  const [newCategory, setNewCategory] = useState({
+  const [newCategory, setNewCategory] = useState<{
+    name: string;
+    color: string;
+    icon: string;
+    categoryType: 'expense' | 'income' | 'investment';
+  }>({
     name: '',
     color: COLORS[0],
-    icon: ICONS[0],
+    icon: ICON_NAMES[0],
+    categoryType: type, // Default to the passed type prop
   });
 
   // Set focus on the search input when dropdown opens
@@ -122,6 +143,23 @@ export function CategorySelect({
     return matchesType && matchesSearch;
   });
 
+  // When dialog opens, update category type to match the current type filter
+  useEffect(() => {
+    if (dialogOpen) {
+      setNewCategory((prev) => ({ ...prev, categoryType: type }));
+    }
+  }, [dialogOpen, type]);
+
+  // Get icon component from name
+  const getIconComponent = (iconName: string) => {
+    const icon = ICONS.find((i) => i.name === iconName);
+    if (icon && icon.component) {
+      const IconComponent = icon.component;
+      return <IconComponent className="h-4 w-4" />;
+    }
+    return null;
+  };
+
   // Handle creating a new category
   const handleCreateCategory = async () => {
     if (!currentUser?.uid) return;
@@ -132,15 +170,20 @@ export function CategorySelect({
 
     setCreating(true);
     try {
+      // Set category flags based on selected type
+      const isExpense = newCategory.categoryType === 'expense';
+      const isIncome = newCategory.categoryType === 'income';
+      const isInvestment = newCategory.categoryType === 'investment';
+
       const categoryData = {
         userId: currentUser.uid,
         name: newCategory.name.trim(),
         color: newCategory.color,
         icon: newCategory.icon,
-        isSystem: false,
-        isIncome: type === 'income',
-        isExpense: type === 'expense',
-        isInvestment: type === 'investment',
+        isSystem: false, // Always false for user-created categories
+        isIncome,
+        isExpense,
+        isInvestment,
       };
 
       await createCategory(categoryData);
@@ -153,7 +196,8 @@ export function CategorySelect({
       setNewCategory({
         name: '',
         color: COLORS[0],
-        icon: ICONS[0],
+        icon: ICON_NAMES[0],
+        categoryType: type,
       });
     } catch (error) {
       toast.error('Failed to create category');
@@ -176,9 +220,11 @@ export function CategorySelect({
             {selectedCategory ? (
               <div className="flex items-center">
                 <div
-                  className="w-4 h-4 rounded-full mr-2"
+                  className="w-5 h-5 rounded-full mr-2 flex items-center justify-center"
                   style={{ backgroundColor: selectedCategory.color }}
-                ></div>
+                >
+                  {getIconComponent(selectedCategory.icon)}
+                </div>
                 <span className="truncate">{selectedCategory.name}</span>
               </div>
             ) : (
@@ -246,9 +292,11 @@ export function CategorySelect({
                       }}
                     >
                       <div
-                        className="w-4 h-4 rounded-full mr-2 flex-shrink-0"
+                        className="w-5 h-5 rounded-full mr-2 flex-shrink-0 flex items-center justify-center"
                         style={{ backgroundColor: cat.color }}
-                      ></div>
+                      >
+                        {getIconComponent(cat.icon)}
+                      </div>
                       <span className="truncate flex-1 text-left">
                         {cat.name}
                       </span>
@@ -303,6 +351,34 @@ export function CategorySelect({
                 autoFocus
               />
             </div>
+
+            <div className="grid gap-2">
+              <Label>Category Type</Label>
+              <RadioGroup
+                value={newCategory.categoryType}
+                onValueChange={(value) =>
+                  setNewCategory({
+                    ...newCategory,
+                    categoryType: value as 'expense' | 'income' | 'investment',
+                  })
+                }
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="expense" id="expense" />
+                  <Label htmlFor="expense">Expense</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="income" id="income" />
+                  <Label htmlFor="income">Income</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="investment" id="investment" />
+                  <Label htmlFor="investment">Investment</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
             <div className="grid gap-2">
               <Label>Color</Label>
               <div className="flex flex-wrap gap-2">
@@ -322,21 +398,25 @@ export function CategorySelect({
                 ))}
               </div>
             </div>
+
             <div className="grid gap-2">
               <Label>Icon</Label>
-              <div className="flex flex-wrap gap-2">
-                {ICONS.map((icon) => (
+              <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto p-1">
+                {ICONS.map(({ name, component: IconComponent }) => (
                   <button
-                    key={icon}
+                    key={name}
                     type="button"
                     className={`w-8 h-8 flex items-center justify-center rounded ${
-                      newCategory.icon === icon
+                      newCategory.icon === name
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted text-muted-foreground'
                     }`}
-                    onClick={() => setNewCategory({ ...newCategory, icon })}
+                    onClick={() =>
+                      setNewCategory({ ...newCategory, icon: name })
+                    }
+                    aria-label={`Select icon ${name}`}
                   >
-                    <span className="text-xs">{icon}</span>
+                    {IconComponent && <IconComponent className="h-5 w-5" />}
                   </button>
                 ))}
               </div>
