@@ -6,43 +6,93 @@ import {
   PhoneAuthProvider,
   signInWithCredential,
   RecaptchaVerifier,
+  User,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config';
 import { UserProfile } from '@/types';
+import {
+  findUserByEmail,
+  findUserByPhone,
+  createUserProfile,
+  mergeUserDataFromAuth,
+} from './user';
 
 // Sign in with Google
-export const signInWithGoogle = async () => {
+export const signInWithGoogle = async (): Promise<{
+  user: User;
+  userProfile: UserProfile;
+  isNewUser: boolean;
+}> => {
   try {
     const provider = new GoogleAuthProvider();
     const userCredential = await signInWithPopup(auth, provider);
     const user = userCredential.user;
 
-    // Check if user already exists in Firestore
+    // Check if we already have a user with this email
+    let existingUser = null;
+    let isNewUser = false;
+
+    if (user.email) {
+      existingUser = await findUserByEmail(user.email);
+    }
+
+    // If user exists with this email, update with Google auth info
+    if (existingUser) {
+      // Update the user's last active timestamp
+      await setDoc(
+        doc(db, 'users', existingUser.id),
+        {
+          lastActive: Date.now(),
+          // Add this auth method if it doesn't exist yet
+          authMethods: [
+            ...(existingUser.authMethods || []),
+            {
+              authMethod: 'google',
+              uid: user.uid,
+              linkedAt: Date.now(),
+            },
+          ],
+        },
+        { merge: true }
+      );
+
+      return {
+        user,
+        userProfile: {
+          ...existingUser,
+          lastActive: Date.now(),
+        },
+        isNewUser: false,
+      };
+    }
+
+    // Check if we already have a user document with this uid
     const userRef = doc(db, 'users', user.uid);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) {
-      // Create new user profile if first time signing in
-      const userProfile: Omit<UserProfile, 'id'> = {
-        name: user.displayName || 'User',
-        email: user.email!,
-        phoneNumber: user.phoneNumber || '',
-        createdAt: Date.now(),
-        lastActive: Date.now(),
-        photoURL: user.photoURL || '',
-      };
+    if (userDoc.exists()) {
+      // User document exists with this UID
+      const userProfile = {
+        id: userDoc.id,
+        ...userDoc.data(),
+      } as UserProfile;
 
-      await setDoc(userRef, userProfile);
-    } else {
       // Update last active timestamp
       await setDoc(userRef, { lastActive: Date.now() }, { merge: true });
+
+      return { user, userProfile, isNewUser: false };
     }
 
-    return user;
+    // This is a new user, create a profile
+    isNewUser = true;
+    const userData = mergeUserDataFromAuth(user);
+
+    const newUserProfile = await createUserProfile(user.uid, userData);
+
+    return { user, userProfile: newUserProfile, isNewUser };
   } catch (error) {
-    const err = error as Error;
-    console.error('Error signing in with Google:', err.message);
+    console.error('Error signing in with Google:', error);
     throw error;
   }
 };
@@ -81,51 +131,86 @@ export const verifyOtpAndSignIn = async (
   verificationId: string,
   otp: string,
   userName?: string
-): Promise<UserProfile> => {
+): Promise<{
+  user: User;
+  userProfile: UserProfile;
+  isNewUser: boolean;
+}> => {
   try {
     // Create credential
     const credential = PhoneAuthProvider.credential(verificationId, otp);
 
     // Sign in with credential
     const userCredential = await signInWithCredential(auth, credential);
-    const firebaseUser = userCredential.user;
+    const user = userCredential.user;
 
-    // Check if user already exists in Firestore
-    const userRef = doc(db, 'users', firebaseUser.uid);
-    const userDoc = await getDoc(userRef);
+    // Check if we already have a user with this phone number
+    let existingUser = null;
+    let isNewUser = false;
 
-    let userProfile: UserProfile;
+    if (user.phoneNumber) {
+      existingUser = await findUserByPhone(user.phoneNumber);
+    }
 
-    if (!userDoc.exists()) {
-      // This is a new user, create a profile
-      const newUserProfile: Omit<UserProfile, 'id'> = {
-        name:
-          userName ||
-          `User_${phoneNumberToUsername(firebaseUser.phoneNumber || '')}`,
-        email: firebaseUser.email || '',
-        phoneNumber: firebaseUser.phoneNumber || '',
-        createdAt: Date.now(),
-        lastActive: Date.now(),
-        photoURL: firebaseUser.photoURL || '',
-      };
+    // If user exists with this phone, update with phone auth info
+    if (existingUser) {
+      // Update the user's last active timestamp
+      await setDoc(
+        doc(db, 'users', existingUser.id),
+        {
+          lastActive: Date.now(),
+          // Add this auth method if it doesn't exist yet
+          authMethods: [
+            ...(existingUser.authMethods || []),
+            {
+              authMethod: 'phone',
+              uid: user.uid,
+              linkedAt: Date.now(),
+            },
+          ],
+        },
+        { merge: true }
+      );
 
-      await setDoc(userRef, newUserProfile);
-
-      userProfile = {
-        id: firebaseUser.uid,
-        ...newUserProfile,
-      };
-    } else {
-      // Existing user, update last active timestamp
-      await setDoc(userRef, { lastActive: Date.now() }, { merge: true });
-
-      userProfile = {
-        id: userDoc.id,
-        ...(userDoc.data() as Omit<UserProfile, 'id'>),
+      return {
+        user,
+        userProfile: {
+          ...existingUser,
+          lastActive: Date.now(),
+        },
+        isNewUser: false,
       };
     }
 
-    return userProfile;
+    // Check if we already have a user document with this uid
+    const userRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userRef);
+
+    if (userDoc.exists()) {
+      // User document exists with this UID
+      const userProfile = {
+        id: userDoc.id,
+        ...userDoc.data(),
+      } as UserProfile;
+
+      // Update last active timestamp
+      await setDoc(userRef, { lastActive: Date.now() }, { merge: true });
+
+      return { user, userProfile, isNewUser: false };
+    }
+
+    // This is a new user, create a profile
+    isNewUser = true;
+    const userData = mergeUserDataFromAuth({
+      uid: user.uid,
+      displayName: userName,
+      phoneNumber: user.phoneNumber,
+      providerId: 'phone',
+    });
+
+    const newUserProfile = await createUserProfile(user.uid, userData);
+
+    return { user, userProfile: newUserProfile, isNewUser };
   } catch (error) {
     console.error('Error verifying OTP:', error);
     throw error;
@@ -165,10 +250,3 @@ export const getCurrentUserProfile = async (
     throw error;
   }
 };
-
-// Helper function to convert phone number to username
-function phoneNumberToUsername(phoneNumber: string): string {
-  // Remove all non-digit characters and take the last 6 digits
-  const digits = phoneNumber.replace(/\D/g, '');
-  return digits.slice(-6);
-}

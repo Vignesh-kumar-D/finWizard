@@ -15,7 +15,7 @@ export default function HomePage() {
       if (!currentUser) {
         router.push('/login');
       } else {
-        router.push('/farmers');
+        router.push('/dashboard');
       }
     }
   }, [currentUser, loading, router]);

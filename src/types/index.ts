@@ -1,6 +1,13 @@
 // types/index.ts
 
 // User profile
+export interface AuthMethod {
+  authMethod: 'google' | 'phone';
+  uid: string;
+  linkedAt: number;
+}
+
+// Updated UserProfile interface
 export interface UserProfile {
   id: string;
   name: string;
@@ -9,6 +16,7 @@ export interface UserProfile {
   createdAt: number; // Timestamp
   lastActive: number; // Timestamp
   photoURL?: string;
+  authMethods?: AuthMethod[]; // Array of authentication methods
 }
 
 // Account types

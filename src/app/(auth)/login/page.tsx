@@ -1,7 +1,7 @@
 // app/auth/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
@@ -11,13 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useFirebase } from '@/lib/firebase/firebase-context';
-import {
-  PhoneIcon,
-  ArrowRightIcon,
-  CheckIcon,
-  KeyIcon,
-  UserIcon,
-} from 'lucide-react';
+import { PhoneIcon, ArrowRightIcon, CheckIcon, KeyIcon } from 'lucide-react';
 
 // Form validation schemas
 const phoneSchema = z.object({
@@ -28,24 +22,33 @@ const otpSchema = z.object({
   otp: z.string().min(6, 'OTP must be 6 digits').max(6),
 });
 
-const nameSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
-});
-
 export default function AuthPage() {
   const router = useRouter();
-  const { loginWithGoogle, initiatePhoneLogin, verifyOtp } = useFirebase();
+  const {
+    loginWithGoogle,
+    initiatePhoneLogin,
+    verifyOtp,
+    currentUser,
+    isProfileComplete,
+  } = useFirebase();
 
   // Form states
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
-  const [userName, setUserName] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [isNewUser, setIsNewUser] = useState(false);
   const [loading, setLoading] = useState(false);
   const [verificationId, setVerificationId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-
+  useEffect(() => {
+    if (currentUser) {
+      // Redirect based on profile completion
+      if (!isProfileComplete) {
+        router.push('/profile/edit');
+      } else {
+        router.push('/dashboard');
+      }
+    }
+  }, [currentUser, isProfileComplete, router]);
   // Format phone number
   const formatPhoneNumber = (value: string) => {
     // Remove non-digit characters
@@ -78,7 +81,6 @@ export default function AuthPage() {
       setVerificationId(verId);
 
       setOtpSent(true);
-      setIsNewUser(true); // We'll determine this during verification
 
       toast.success('OTP sent to your phone', {
         description: 'Please enter the verification code you received',
@@ -113,21 +115,22 @@ export default function AuthPage() {
       // Validate OTP
       otpSchema.parse({ otp });
 
-      if (isNewUser && userName) {
-        // Validate name for new users
-        nameSchema.parse({ name: userName });
-      }
-
       // Verify OTP
-      await verifyOtp(verificationId, otp, isNewUser ? userName : undefined);
+      await verifyOtp(verificationId, otp);
 
       toast.success(
-        isNewUser ? 'Account created successfully!' : 'Welcome back!',
+        !isProfileComplete ? 'Account created successfully!' : 'Welcome back!',
         {
           description: "You've successfully logged in",
         }
       );
-      router.push('/dashboard');
+      if (!isProfileComplete) {
+        toast.success('Account created! Please complete your profile.');
+        router.push('/profile/edit');
+      } else {
+        toast.success('Welcome back!');
+        router.push('/dashboard');
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         const formattedErrors: Record<string, string> = {};
@@ -153,7 +156,13 @@ export default function AuthPage() {
     try {
       await loginWithGoogle();
       toast.success("Welcome! You've successfully logged in with Google.");
-      router.push('/dashboard');
+      if (!isProfileComplete) {
+        toast.success('Account created! Please complete your profile.');
+        router.push('/profile/edit');
+      } else {
+        toast.success('Welcome back!');
+        router.push('/dashboard');
+      }
     } catch (error) {
       toast.error('Login failed', {
         description:
@@ -266,31 +275,6 @@ export default function AuthPage() {
                       <p className="text-sm text-red-500">{errors.otp}</p>
                     )}
                   </div>
-
-                  {isNewUser && (
-                    <div className="space-y-2">
-                      <Label htmlFor="userName">Your Name</Label>
-                      <div className="relative">
-                        <Input
-                          id="userName"
-                          type="text"
-                          placeholder="John Doe"
-                          value={userName}
-                          onChange={(e) => setUserName(e.target.value)}
-                          className={`pl-10 ${
-                            errors.name ? 'border-red-500' : ''
-                          }`}
-                        />
-                        <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      </div>
-                      {errors.name && (
-                        <p className="text-sm text-red-500">{errors.name}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Please provide your name for your new account
-                      </p>
-                    </div>
-                  )}
 
                   <div className="flex justify-between items-center">
                     <button
