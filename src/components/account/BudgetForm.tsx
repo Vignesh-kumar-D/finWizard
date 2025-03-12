@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useBudgets } from '@/lib/firebase/budget-context';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -61,7 +61,7 @@ interface BudgetFormProps {
 
 export default function BudgetForm({ budgetId }: BudgetFormProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  // const searchParams = useSearchParams();
   const {
     budgets,
     categories,
@@ -77,7 +77,7 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
   const [initialLoading, setInitialLoading] = useState(!!budgetId);
 
   // Get category type from URL if provided
-  const categoryType = searchParams.get('type') || 'expense';
+  // const categoryType = searchParams.get('type') || 'expense';
 
   // Initialize form
   const form = useForm<BudgetFormValues>({
@@ -98,7 +98,6 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
 
       setInitialLoading(true);
       try {
-        await refreshBudgets();
         const budget = budgets.find((b) => b.id === budgetId);
 
         if (budget) {
@@ -300,8 +299,7 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
                       value={field.value}
                       onChange={field.onChange}
                       categories={categories}
-                      type={categoryType as 'expense' | 'income' | 'investment'}
-                      refreshCategories={refreshBudgets}
+                      type={'expense'}
                     />
                   </FormControl>
                   <FormDescription>

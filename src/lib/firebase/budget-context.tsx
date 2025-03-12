@@ -1,7 +1,13 @@
 // contexts/BudgetContext.tsx
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from 'react';
 import { useFirebase } from './firebase-context';
 import {
   getBudgetsWithCategories,
@@ -54,19 +60,7 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
   const currentMonth = getCurrentMonth();
 
   // Load budgets whenever user or selected month changes
-  useEffect(() => {
-    if (currentUser) {
-      refreshBudgets();
-    } else {
-      setBudgets([]);
-      setCategories([]);
-      setSummary(null);
-      setLoading(false);
-    }
-  }, [currentUser, selectedMonth]);
-
-  // Refresh budget data
-  const refreshBudgets = async () => {
+  const refreshBudgets = useCallback(async () => {
     if (!currentUser) return;
 
     setLoading(true);
@@ -93,7 +87,19 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedMonth, currentUser]);
+  useEffect(() => {
+    if (currentUser) {
+      refreshBudgets();
+    } else {
+      setBudgets([]);
+      setCategories([]);
+      setSummary(null);
+      setLoading(false);
+    }
+  }, [currentUser, selectedMonth, refreshBudgets]);
+
+  // Refresh budget data
 
   // Create a new budget
   const createBudget = async (
