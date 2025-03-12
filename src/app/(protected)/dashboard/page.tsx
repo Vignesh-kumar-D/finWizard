@@ -17,7 +17,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   TrendingUp,
-  DollarSign,
+  IndianRupee,
   Wallet,
   CreditCard,
   PlusCircle,
@@ -33,9 +33,14 @@ export default function DashboardPage() {
 
   // Dummy data for demonstration
   const accounts = [
-    { id: '1', name: 'Checking Account', balance: 3250.75, type: 'bank' },
-    { id: '2', name: 'Savings Account', balance: 12500.0, type: 'bank' },
-    { id: '3', name: 'Credit Card', balance: -450.25, type: 'credit' },
+    {
+      id: '1',
+      name: 'Checking Account',
+      balance: 3250.75,
+      type: 'checking-bank',
+    },
+    { id: '2', name: 'Savings Account', balance: 12500.0, type: 'saving-bank' },
+    { id: '3', name: 'Credit Card', balance: -450.25, type: 'credit-card' },
   ];
 
   const recentTransactions = [
@@ -176,7 +181,7 @@ export default function DashboardPage() {
                 </h3>
               </div>
               <div className="p-2 rounded-full bg-budget/20">
-                <DollarSign className="h-4 w-4 text-budget" />
+                <IndianRupee className="h-4 w-4 text-budget" />
               </div>
             </div>
             <div className="flex items-center mt-3 text-xs">

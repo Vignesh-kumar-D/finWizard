@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/lib/theme';
 import { FirebaseProvider } from '@/lib/firebase/firebase-context';
+import { AccountProvider } from '@/lib/firebase/account-context';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -30,7 +31,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased ${inter.className}}`}
       >
         <FirebaseProvider>
-          <ThemeProvider defaultTheme="light">{children}</ThemeProvider>
+          <AccountProvider>
+            <ThemeProvider defaultTheme="light">{children}</ThemeProvider>
+          </AccountProvider>
         </FirebaseProvider>
       </body>
     </html>

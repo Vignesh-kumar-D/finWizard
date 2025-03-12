@@ -21,9 +21,10 @@ export interface UserProfile {
 
 // Account types
 export type AccountType =
-  | 'bank'
+  | 'checking-bank'
   | 'cash'
-  | 'credit'
+  | 'credit-card'
+  | 'saving-bank'
   | 'upi'
   | 'investment'
   | 'loan';
