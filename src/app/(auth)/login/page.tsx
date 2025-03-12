@@ -43,6 +43,7 @@ export default function AuthPage() {
     if (currentUser && !loading) {
       // Redirect based on profile completion
       if (!isProfileComplete) {
+        // Call this when a new user signs up
         router.push('/profile/edit');
       } else {
         router.push('/dashboard');
