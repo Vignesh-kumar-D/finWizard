@@ -21,7 +21,6 @@ import {
   PieChart,
   User,
   LogOut,
-  Settings,
   ChevronDown,
   Bell,
 } from 'lucide-react';
@@ -153,15 +152,7 @@ const Header = () => {
                     Profile
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link
-                    href="/settings"
-                    className="flex items-center w-full cursor-pointer"
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    Settings
-                  </Link>
-                </DropdownMenuItem>
+
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="w-4 h-4 mr-2" />

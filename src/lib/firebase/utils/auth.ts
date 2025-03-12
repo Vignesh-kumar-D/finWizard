@@ -40,19 +40,32 @@ export const signInWithGoogle = async (): Promise<{
     // If user exists with this email, update with Google auth info
     if (existingUser) {
       // Update the user's last active timestamp
-      await setDoc(
-        doc(db, 'users', existingUser.id),
-        {
-          lastActive: Date.now(),
-          // Add this auth method if it doesn't exist yet
-          authMethods: [
-            ...(existingUser.authMethods || []),
+      // Get current auth methods
+      const currentAuthMethods = existingUser.authMethods || [];
+
+      // Check if this Google auth method already exists
+      const hasGoogleMethod = currentAuthMethods.some(
+        (method) => method.authMethod === 'google' && method.uid === user.uid
+      );
+
+      // Only add if it doesn't exist
+      const updatedAuthMethods = hasGoogleMethod
+        ? currentAuthMethods
+        : [
+            ...currentAuthMethods,
             {
               authMethod: 'google',
               uid: user.uid,
               linkedAt: Date.now(),
             },
-          ],
+          ];
+
+      // Update the user's profile
+      await setDoc(
+        doc(db, 'users', existingUser.id),
+        {
+          lastActive: Date.now(),
+          authMethods: updatedAuthMethods,
         },
         { merge: true }
       );
@@ -155,19 +168,32 @@ export const verifyOtpAndSignIn = async (
     // If user exists with this phone, update with phone auth info
     if (existingUser) {
       // Update the user's last active timestamp
-      await setDoc(
-        doc(db, 'users', existingUser.id),
-        {
-          lastActive: Date.now(),
-          // Add this auth method if it doesn't exist yet
-          authMethods: [
-            ...(existingUser.authMethods || []),
+      // Get current auth methods
+      const currentAuthMethods = existingUser.authMethods || [];
+
+      // Check if this phone auth method already exists
+      const hasPhoneMethod = currentAuthMethods.some(
+        (method) => method.authMethod === 'phone' && method.uid === user.uid
+      );
+
+      // Only add if it doesn't exist
+      const updatedAuthMethods = hasPhoneMethod
+        ? currentAuthMethods
+        : [
+            ...currentAuthMethods,
             {
               authMethod: 'phone',
               uid: user.uid,
               linkedAt: Date.now(),
             },
-          ],
+          ];
+
+      // Update the user's profile
+      await setDoc(
+        doc(db, 'users', existingUser.id),
+        {
+          lastActive: Date.now(),
+          authMethods: updatedAuthMethods,
         },
         { merge: true }
       );

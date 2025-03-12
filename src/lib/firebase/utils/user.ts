@@ -202,10 +202,9 @@ export const isProfileComplete = (userProfile: UserProfile | null): boolean => {
 
   // Check if all required fields are present and valid
   return (
-    !!userProfile.name &&
-    (!!userProfile.email || !!userProfile.phoneNumber) &&
-    // Additional checks can be added based on your requirements
-    true
+    !!userProfile.name.trim() &&
+    (!!userProfile.email || !!userProfile.phoneNumber)
+    // Additional checks can be added based on your requirement
   );
 };
 

@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useFirebase } from '@/lib/firebase/firebase-context';
 import { PhoneIcon, ArrowRightIcon, CheckIcon, KeyIcon } from 'lucide-react';
-
+import { isProfileComplete as checkProfileCompletion } from '@/lib/firebase/utils/user';
 // Form validation schemas
 const phoneSchema = z.object({
   phoneNumber: z.string().min(10, 'Enter a valid phone number').max(15),
@@ -40,7 +40,7 @@ export default function AuthPage() {
   const [verificationId, setVerificationId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser && !loading) {
       // Redirect based on profile completion
       if (!isProfileComplete) {
         router.push('/profile/edit');
@@ -48,7 +48,7 @@ export default function AuthPage() {
         router.push('/dashboard');
       }
     }
-  }, [currentUser, isProfileComplete, router]);
+  }, [currentUser, isProfileComplete, router, loading]);
   // Format phone number
   const formatPhoneNumber = (value: string) => {
     // Remove non-digit characters
@@ -116,7 +116,7 @@ export default function AuthPage() {
       otpSchema.parse({ otp });
 
       // Verify OTP
-      await verifyOtp(verificationId, otp);
+      const { userProfile } = await verifyOtp(verificationId, otp);
 
       toast.success(
         !isProfileComplete ? 'Account created successfully!' : 'Welcome back!',
@@ -124,7 +124,7 @@ export default function AuthPage() {
           description: "You've successfully logged in",
         }
       );
-      if (!isProfileComplete) {
+      if (!checkProfileCompletion(userProfile)) {
         toast.success('Account created! Please complete your profile.');
         router.push('/profile/edit');
       } else {
@@ -154,9 +154,9 @@ export default function AuthPage() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      await loginWithGoogle();
+      const { userProfile } = await loginWithGoogle();
       toast.success("Welcome! You've successfully logged in with Google.");
-      if (!isProfileComplete) {
+      if (!checkProfileCompletion(userProfile)) {
         toast.success('Account created! Please complete your profile.');
         router.push('/profile/edit');
       } else {

@@ -70,9 +70,8 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({
         try {
           const profile = await getCurrentUserProfile(user.uid);
           setUserProfile(profile);
-          setProfileCompleteStatus(
-            profile ? isProfileComplete(profile) : false
-          );
+          const profileComplete = profile ? isProfileComplete(profile) : false;
+          setProfileCompleteStatus(profileComplete);
         } catch (error) {
           console.error('Error fetching user profile:', error);
         }
@@ -85,7 +84,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [userProfile]);
 
   const loginWithGoogle = async () => {
     const result = await signInWithGoogle();
