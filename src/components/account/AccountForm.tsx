@@ -140,13 +140,18 @@ export default function AccountForm({ accountId }: AccountFormProps) {
   // Account type options with icons
   const accountTypes = [
     {
-      value: 'bank',
-      label: 'Bank Account',
+      value: 'checking-bank',
+      label: 'Checking Bank Account',
+      icon: <Building className="mr-2 h-4 w-4" />,
+    },
+    {
+      value: 'saving-bank',
+      label: 'Savings Bank Account',
       icon: <Building className="mr-2 h-4 w-4" />,
     },
     { value: 'cash', label: 'Cash', icon: <Wallet className="mr-2 h-4 w-4" /> },
     {
-      value: 'credit',
+      value: 'credit-card',
       label: 'Credit Card',
       icon: <CreditCard className="mr-2 h-4 w-4" />,
     },

@@ -101,8 +101,9 @@ export default function AccountsPage() {
   const getAccountTypeName = (type: AccountType) => {
     switch (type) {
       case 'checking-bank':
+        return 'Checking Bank Account';
       case 'saving-bank':
-        return 'Bank Account';
+        return 'Savings Bank Account';
       case 'cash':
         return 'Cash';
       case 'investment':
@@ -182,7 +183,7 @@ export default function AccountsPage() {
                 ) : (
                   new Intl.NumberFormat('en-US', {
                     style: 'currency',
-                    currency: 'USD',
+                    currency: 'INR',
                   }).format(totalBalance)
                 )}
               </span>
@@ -199,9 +200,10 @@ export default function AccountsPage() {
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList className="grid grid-cols-3 sm:grid-cols-7">
           <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="bank">Bank</TabsTrigger>
+          <TabsTrigger value="checking-bank">Checking bank</TabsTrigger>
+          <TabsTrigger value="saving-bank">Saving bank</TabsTrigger>
           <TabsTrigger value="cash">Cash</TabsTrigger>
-          <TabsTrigger value="credit">Credit</TabsTrigger>
+          <TabsTrigger value="credit-card">Credit card</TabsTrigger>
           <TabsTrigger value="investment">Investment</TabsTrigger>
           <TabsTrigger value="upi">UPI</TabsTrigger>
           <TabsTrigger value="loan">Loan</TabsTrigger>
