@@ -69,7 +69,7 @@ function BudgetCard({ budget }: { budget: BudgetWithCategory }) {
                 className="text-lg"
                 style={{ color: budget.category.color }}
               >
-                <IconComponent />
+                {IconComponent && <IconComponent />}
               </span>
             </div>
             <div>
@@ -379,11 +379,39 @@ export default function BudgetPage() {
           {/* Detailed budget tabs */}
           <Tabs defaultValue="expense" className="space-y-4">
             <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="expense">Expenses</TabsTrigger>
               <TabsTrigger value="income">Income</TabsTrigger>
               <TabsTrigger value="investment">Investments</TabsTrigger>
             </TabsList>
-
+            <TabsContent value="all">
+              {budgets.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <ArrowUpRight className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-medium mb-2">No budgets</h3>
+                    <p className="text-muted-foreground text-center max-w-md mb-6">
+                      Track your spending and saving by creating budgets for
+                      different categories.
+                    </p>
+                    <Button asChild>
+                      <Link href="/budget/new?type=income">
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Create a new Budget
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {budgets.map((budget) => (
+                    <Link href={`/budget/edit/${budget.id}`} key={budget.id}>
+                      <BudgetCard budget={budget} />
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
             <TabsContent value="expense">
               {getBudgetsByType('expense').length === 0 ? (
                 <Card>

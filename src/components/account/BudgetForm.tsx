@@ -77,7 +77,6 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
   const [initialLoading, setInitialLoading] = useState(!!budgetId);
 
   // Get category type from URL if provided
-  // const categoryType = searchParams.get('type') || 'expense';
 
   // Initialize form
   const form = useForm<BudgetFormValues>({
@@ -90,7 +89,7 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
       rolloverEnabled: false,
     },
   });
-
+  console.log('categories in budget', categories);
   // Fetch budget data if editing
   useEffect(() => {
     const fetchBudget = async () => {

@@ -82,16 +82,11 @@ export function CategorySelect({
 
   // Filter categories based on search term and type
   const filteredCategories = categories.filter((cat) => {
-    const matchesType =
-      (type === 'expense' && cat.isExpense) ||
-      (type === 'income' && cat.isIncome) ||
-      (type === 'investment' && cat.isInvestment);
-
     const matchesSearch =
       search.trim() === '' ||
       cat.name.toLowerCase().includes(search.toLowerCase());
 
-    return matchesType && matchesSearch;
+    return matchesSearch;
   });
 
   // When dialog opens, update category type to match the current type filter
