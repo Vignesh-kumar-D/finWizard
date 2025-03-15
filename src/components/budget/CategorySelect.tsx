@@ -40,7 +40,7 @@ interface CategorySelectProps {
   onChange: (value: string) => void;
   categories: Category[];
   type: 'expense' | 'income' | 'investment';
-  handleNewBudgetCreated: (categoryId: string) => Promise<void>;
+  handleNewCategoryCreated: (categoryId: string) => Promise<void>;
 }
 
 export function CategorySelect({
@@ -48,7 +48,7 @@ export function CategorySelect({
   onChange,
   categories,
   type,
-  handleNewBudgetCreated,
+  handleNewCategoryCreated,
 }: CategorySelectProps) {
   const [open, setOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -138,7 +138,7 @@ export function CategorySelect({
       };
 
       const { id } = await createCategory(categoryData);
-      await handleNewBudgetCreated(id);
+      await handleNewCategoryCreated(id);
       toast.success('Category created successfully');
       setDialogOpen(false);
       setOpen(false);

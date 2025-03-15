@@ -186,7 +186,7 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
 
     return options;
   };
-  const handleNewBudgetCreated = async (categoryId: string) => {
+  const handleNewCategoryCreated = async (categoryId: string) => {
     await refreshBudgets();
     form.setValue('categoryId', categoryId);
   };
@@ -303,7 +303,7 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
                       onChange={field.onChange}
                       categories={categories}
                       type={'expense'}
-                      handleNewBudgetCreated={handleNewBudgetCreated}
+                      handleNewCategoryCreated={handleNewCategoryCreated}
                     />
                   </FormControl>
                   <FormDescription>
