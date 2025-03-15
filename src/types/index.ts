@@ -1,5 +1,7 @@
 // types/index.ts
 
+import { ICON_NAMES } from '@/lib/constants';
+
 // User profile
 export interface AuthMethod {
   authMethod: 'google' | 'phone';
@@ -86,7 +88,7 @@ export interface Category {
   userId: string;
   name: string;
   color: string;
-  icon: string;
+  icon: (typeof ICON_NAMES)[number];
   isSystem: boolean; // System categories cannot be deleted
   isIncome: boolean; // Is this an income category?
   isExpense: boolean; // Is this an expense category?

@@ -68,7 +68,6 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
       // Load categories
       const userCategories = await getUserCategories(currentUser.uid);
       setCategories(userCategories);
-
       // Load budgets with category details
       const budgetsWithCats = await getBudgetsWithCategories(
         currentUser.uid,

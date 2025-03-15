@@ -26,12 +26,13 @@ import {
   PlusCircle,
   RefreshCw,
   PieChart,
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
   Loader2,
 } from 'lucide-react';
+import * as lucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 
 // Helper components
@@ -53,6 +54,7 @@ function BudgetCard({ budget }: { budget: BudgetWithCategory }) {
     'on-track': 'bg-blue-600',
     over: 'bg-red-600',
   };
+  const IconComponent = lucideIcons[budget.category.icon];
 
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
@@ -67,7 +69,7 @@ function BudgetCard({ budget }: { budget: BudgetWithCategory }) {
                 className="text-lg"
                 style={{ color: budget.category.color }}
               >
-                {budget.category.icon}
+                <IconComponent />
               </span>
             </div>
             <div>
@@ -296,7 +298,7 @@ export default function BudgetPage() {
             <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center text-blue-700">
-                  <DollarSign className="mr-2 h-5 w-5" />
+                  <IndianRupee className="mr-2 h-5 w-5" />
                   Savings
                 </CardTitle>
                 <CardDescription>Monthly savings</CardDescription>

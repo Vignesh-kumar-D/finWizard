@@ -25,60 +25,9 @@ import { toast } from 'sonner';
 import { createCategory } from '@/lib/firebase/utils/category';
 import { useFirebase } from '@/lib/firebase/firebase-context';
 import * as lucideIcons from 'lucide-react';
+import { COLORS, ICON_NAMES } from '@/lib/constants';
 
 // List of preset colors to choose from
-const COLORS = [
-  '#FF5252',
-  '#FF4081',
-  '#E040FB',
-  '#7C4DFF',
-  '#536DFE',
-  '#448AFF',
-  '#40C4FF',
-  '#18FFFF',
-  '#64FFDA',
-  '#69F0AE',
-  '#B2FF59',
-  '#EEFF41',
-  '#FFFF00',
-  '#FFD740',
-  '#FFAB40',
-  '#FF6E40',
-  '#9E9E9E',
-  '#607D8B',
-];
-
-// List of preset icons to choose from with actual Lucide icons
-const ICON_NAMES = [
-  'ShoppingBag',
-  'Utensils',
-  'Home',
-  'Car',
-  'Bus',
-  'Film',
-  'Coffee',
-  'Gift',
-  'Heart',
-  'Book',
-  'Droplet',
-  'Zap',
-  'DollarSign',
-  'CreditCard',
-  'Smartphone',
-  'Wifi',
-  'Tv',
-  'Globe',
-  'Briefcase',
-  'Users',
-  'Calendar',
-  'Plane',
-  'Train',
-  'School',
-  'Backpack',
-  'Wallet',
-  'ShoppingCart',
-  'Building',
-] as const;
 
 // Get actual icon components from Lucide
 const ICONS = ICON_NAMES.map((name) => ({
@@ -91,6 +40,7 @@ interface CategorySelectProps {
   onChange: (value: string) => void;
   categories: Category[];
   type: 'expense' | 'income' | 'investment';
+  handleNewBudgetCreated: (categoryId: string) => Promise<void>;
 }
 
 export function CategorySelect({
@@ -98,6 +48,7 @@ export function CategorySelect({
   onChange,
   categories,
   type,
+  handleNewBudgetCreated,
 }: CategorySelectProps) {
   const [open, setOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -110,7 +61,7 @@ export function CategorySelect({
   const [newCategory, setNewCategory] = useState<{
     name: string;
     color: string;
-    icon: string;
+    icon: (typeof ICON_NAMES)[number];
     categoryType: 'expense' | 'income' | 'investment';
   }>({
     name: '',
@@ -186,8 +137,8 @@ export function CategorySelect({
         isInvestment,
       };
 
-      await createCategory(categoryData);
-
+      const { id } = await createCategory(categoryData);
+      await handleNewBudgetCreated(id);
       toast.success('Category created successfully');
       setDialogOpen(false);
       setOpen(false);

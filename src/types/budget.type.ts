@@ -1,5 +1,7 @@
 // types/budget.ts
 
+import { ICON_NAMES } from '@/lib/constants';
+
 // Budget interface
 export interface Budget {
   id: string;
@@ -30,7 +32,7 @@ export interface BudgetWithCategory extends Budget {
   category: {
     name: string;
     color: string;
-    icon: string;
+    icon: (typeof ICON_NAMES)[number];
     isExpense: boolean;
     isIncome: boolean;
     isInvestment: boolean;

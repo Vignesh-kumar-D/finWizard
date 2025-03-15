@@ -186,7 +186,10 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
 
     return options;
   };
-
+  const handleNewBudgetCreated = async (categoryId: string) => {
+    await refreshBudgets();
+    form.setValue('categoryId', categoryId);
+  };
   if (initialLoading) {
     return (
       <div className="flex justify-center items-center min-h-[300px]">
@@ -300,6 +303,7 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
                       onChange={field.onChange}
                       categories={categories}
                       type={'expense'}
+                      handleNewBudgetCreated={handleNewBudgetCreated}
                     />
                   </FormControl>
                   <FormDescription>
