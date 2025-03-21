@@ -89,7 +89,6 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
       rolloverEnabled: false,
     },
   });
-  console.log('categories in budget', categories);
   // Fetch budget data if editing
   useEffect(() => {
     const fetchBudget = async () => {

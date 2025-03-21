@@ -40,6 +40,7 @@ import {
   ReceiptUpload,
   RecurringOptions,
 } from '@/components/transaction';
+import { useFirebase } from '@/lib/firebase/firebase-context';
 
 // Define Zod schema for transaction form
 
@@ -93,6 +94,7 @@ export default function NewTransactionPage() {
   const router = useRouter();
   const { addTransaction, addPayee, payees, tags, addTag, createRecurring } =
     useTransactions();
+  const { currentUser } = useFirebase();
   const { accounts } = useAccounts();
   const { categories } = useBudgets();
 
@@ -186,33 +188,30 @@ export default function NewTransactionPage() {
         setIsSubmitting(false);
         return;
       }
-
       // Format the data for submission
       const transaction = {
-        userId: '', // Will be set by the server
+        userId: currentUser?.uid ?? '', // Will be set by the server
         date: data.date.getTime(),
         amount: parseFloat(data.amount),
         type: data.type,
         categoryId: data.categoryId || '',
         accountId: data.accountId,
-        toAccountId: data.type === 'transfer' ? data.toAccountId : undefined,
-        payeeId: selectedPayee || undefined,
-        payeeName:
-          !selectedPayee && newPayeeName.trim()
-            ? newPayeeName.trim()
-            : undefined,
+        toAccountId: data.type === 'transfer' ? data.toAccountId : null,
+        payeeId: selectedPayee || null,
+        payeeName: newPayeeName.trim() ? newPayeeName.trim() : null,
         paymentMethod: data.paymentMethod,
         description: data.description,
-        tags: selectedTags.length > 0 ? selectedTags : undefined,
+        tags: selectedTags.length > 0 ? selectedTags : [],
         isPlanned: false,
         isRecurring: isRecurring,
         recurringId: '',
+        receiptImageUrl: '',
       };
 
       // If it's a recurring transaction, create that first
       if (isRecurring) {
         const recurring = {
-          userId: '', // Will be set by the server
+          userId: currentUser?.uid ?? '', // Will be set by the server
           title: `${transaction.payeeName || 'Transaction'} (${
             transaction.amount
           })`,
@@ -228,7 +227,7 @@ export default function NewTransactionPage() {
           tags: transaction.tags,
           frequency: recurringFrequency,
           startDate: transaction.date,
-          endDate: recurringEndDate ? recurringEndDate.getTime() : undefined,
+          endDate: recurringEndDate ? recurringEndDate.getTime() : null,
           nextDueDate: transaction.date,
           isActive: true,
           createdAt: Date.now(),
@@ -263,13 +262,13 @@ export default function NewTransactionPage() {
 
     try {
       const newPayee = await addPayee({
-        userId: '', // Will be set by the server
+        userId: currentUser?.uid ?? '', // Will be set by the server
         name: payeeName,
         type: 'person',
       });
 
       setSelectedPayee(newPayee.id);
-      setNewPayeeName('');
+      setNewPayeeName(newPayee.name);
 
       toast.success('Payee added');
 

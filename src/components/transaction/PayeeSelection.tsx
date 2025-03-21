@@ -55,7 +55,16 @@ export function PayeeSelection({
       </div>
 
       {!showAddPayee ? (
-        <Select onValueChange={setSelectedPayee} value={selectedPayee}>
+        <Select
+          onValueChange={(val) => {
+            const selectedPayeeObject = payees.find(
+              (payee) => payee.id === val
+            );
+            setSelectedPayee(val);
+            setNewPayeeName(selectedPayeeObject?.name ?? '');
+          }}
+          value={selectedPayee}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Select payee (optional)" />
           </SelectTrigger>

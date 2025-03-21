@@ -11,13 +11,13 @@ export interface Transaction {
   type: TransactionType;
   categoryId: string;
   accountId: string;
-  toAccountId?: string; // For transfers
-  payeeId?: string;
-  payeeName?: string; // In case payee is not in the system
-  paymentMethod?: PaymentMethod;
+  toAccountId?: string | null; // For transfers
+  payeeId?: string | null;
+  payeeName?: string | null; // In case payee is not in the system
+  paymentMethod?: PaymentMethod | null;
   description?: string;
   tags?: string[];
-  receiptImageUrl?: string;
+  receiptImageUrl?: string | null;
   location?: {
     lat: number;
     lng: number;
@@ -48,17 +48,16 @@ export interface RecurringTransaction {
   amount: number;
   type: TransactionType;
   categoryId: string;
-  subcategoryId?: string;
   accountId: string;
-  toAccountId?: string;
-  payeeId?: string;
-  payeeName?: string;
-  paymentMethod?: PaymentMethod;
-  description?: string;
+  toAccountId?: string | null;
+  payeeId?: string | null;
+  payeeName?: string | null;
+  paymentMethod?: PaymentMethod | null;
+  description?: string | null;
   tags?: string[];
   frequency: RecurrenceFrequency;
   startDate: number; // Timestamp
-  endDate?: number; // Timestamp, null for indefinite
+  endDate?: number | null; // Timestamp, null for indefinite
   nextDueDate: number; // Timestamp
   isActive: boolean;
   createdAt: number; // Timestamp
