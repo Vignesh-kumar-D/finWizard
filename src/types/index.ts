@@ -63,7 +63,6 @@ export interface Transaction {
   amount: number;
   type: TransactionType;
   categoryId: string;
-  subcategoryId?: string;
   accountId: string;
   toAccountId?: string; // For transfers
   paymentMethod?: PaymentMethod;

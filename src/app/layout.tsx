@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/lib/theme';
 import { FirebaseProvider } from '@/lib/firebase/firebase-context';
 import { AccountProvider } from '@/lib/firebase/account-context';
 import { BudgetProvider } from '@/lib/firebase/budget-context';
+import { TransactionProvider } from '@/lib/firebase/transaction-context';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -34,7 +35,9 @@ export default function RootLayout({
         <FirebaseProvider>
           <AccountProvider>
             <BudgetProvider>
-              <ThemeProvider defaultTheme="light">{children}</ThemeProvider>
+              <TransactionProvider>
+                <ThemeProvider defaultTheme="light">{children}</ThemeProvider>
+              </TransactionProvider>
             </BudgetProvider>
           </AccountProvider>
         </FirebaseProvider>
