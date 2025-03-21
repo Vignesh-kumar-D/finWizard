@@ -1,7 +1,13 @@
 // contexts/TransactionContext.tsx
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from 'react';
 import { useFirebase } from './firebase-context';
 import {
   getUserTransactions,
@@ -82,20 +88,8 @@ export const TransactionProvider = ({
   const [loading, setLoading] = useState<boolean>(true);
 
   // Load transactions when user changes
-  useEffect(() => {
-    if (currentUser) {
-      refreshTransactions();
-    } else {
-      setTransactions([]);
-      setRecentTransactions([]);
-      setPayees([]);
-      setTags([]);
-      setLoading(false);
-    }
-  }, [currentUser]);
-
   // Refresh transactions data
-  const refreshTransactions = async () => {
+  const refreshTransactions = useCallback(async () => {
     if (!currentUser) return;
 
     setLoading(true);
@@ -120,7 +114,18 @@ export const TransactionProvider = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser]);
+  useEffect(() => {
+    if (currentUser) {
+      refreshTransactions();
+    } else {
+      setTransactions([]);
+      setRecentTransactions([]);
+      setPayees([]);
+      setTags([]);
+      setLoading(false);
+    }
+  }, [currentUser, refreshTransactions]);
 
   // Get a single transaction
   const getTransaction = async (id: string) => {

@@ -23,6 +23,7 @@ import {
   LogOut,
   ChevronDown,
   Bell,
+  Group,
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -97,6 +98,15 @@ const Header = () => {
             >
               Budget
             </Link>
+            <Link
+              href="/groups"
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
+                isActive('/groups') ? 'bg-accent text-accent-foreground' : ''
+              }`}
+            >
+              Groups
+            </Link>
+
             <Button asChild variant="default" className="ml-2">
               <Link href="/transactions/new">
                 <PlusCircle className="w-4 h-4 mr-2" />
@@ -206,7 +216,15 @@ const Header = () => {
             <PieChart className="w-5 h-5" />
             <span className="text-xs mt-1">Budget</span>
           </Link>
-
+          <Link
+            href="/groups"
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              isActive('/groups') ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            <Group className="w-5 h-5" />
+            <span className="text-xs mt-1">Groups</span>
+          </Link>
           <Link
             href="/profile"
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${

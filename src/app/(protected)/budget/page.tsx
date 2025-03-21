@@ -191,6 +191,9 @@ export default function BudgetPage() {
           </p>
         </div>
         <div className="flex items-center mt-4 sm:mt-0 space-x-2">
+          <Button variant="outline">
+            <Link href="/transactions">Recent Transactions</Link>
+          </Button>
           <Button asChild>
             <Link href="/budget/new">
               <PlusCircle className="mr-2 h-4 w-4" />

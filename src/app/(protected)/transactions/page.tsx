@@ -1,13 +1,21 @@
 // app/transactions/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Plus, Filter, ArrowUpDown, Search } from 'lucide-react';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  getYear,
+  getMonth,
+  parseISO,
+} from 'date-fns';
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTransactions } from '@/lib/firebase/transaction-context';
-import { Transaction } from '@/types/transaction';
+import { Transaction, TransactionTag } from '@/types/transaction';
+import { TransactionType } from '@/types/index';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
@@ -16,74 +24,176 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+
 import { cn } from '@/lib/utils';
+import { z } from 'zod';
+
+// Define schema for date filter
+export const DateFilterSchema = z.object({
+  month: z.number().min(0).max(11),
+  year: z.number().min(1900).max(2100),
+});
+
+type DateFilter = z.infer<typeof DateFilterSchema>;
 
 export default function TransactionsPage() {
-  const { transactions, loading, refreshTransactions } = useTransactions();
-  const [filteredTransactions, setFilteredTransactions] = useState<
-    Transaction[]
-  >([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<string | null>(null);
-  const [sortOption, setSortOption] = useState<
-    'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
-  >('date-desc');
+  const { transactions, loading, refreshTransactions, tags } =
+    useTransactions();
 
-  useEffect(() => {
-    refreshTransactions();
-  }, []);
+  // Get current month and year for initial filter
+  const currentDate = useMemo(() => new Date(), []);
+  const [dateFilter, setDateFilter] = useState<DateFilter>({
+    month: getMonth(currentDate),
+    year: getYear(currentDate),
+  });
 
-  useEffect(() => {
-    // Apply filtering and sorting
-    let result = [...transactions];
+  // Generate list of years for filtering (5 years back to current year)
+  const availableYears = useMemo(() => {
+    const currentYear = getYear(currentDate);
+    return Array.from({ length: 6 }, (_, i) => currentYear - 5 + i);
+  }, [currentDate]);
 
-    // Filter by search term
-    if (searchTerm.trim() !== '') {
-      result = result.filter(
-        (t) =>
-          t.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.payeeName?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+  // Generate month options
+  const months = [
+    { value: 0, label: 'January' },
+    { value: 1, label: 'February' },
+    { value: 2, label: 'March' },
+    { value: 3, label: 'April' },
+    { value: 4, label: 'May' },
+    { value: 5, label: 'June' },
+    { value: 6, label: 'July' },
+    { value: 7, label: 'August' },
+    { value: 8, label: 'September' },
+    { value: 9, label: 'October' },
+    { value: 10, label: 'November' },
+    { value: 11, label: 'December' },
+  ];
 
-    // Filter by transaction type
-    if (filterType) {
-      result = result.filter((t) => t.type === filterType);
-    }
+  // Filter transactions by month and year
+  const filteredTransactions = useMemo(() => {
+    if (!transactions.length) return [];
 
-    // Apply sorting
-    result.sort((a, b) => {
-      switch (sortOption) {
-        case 'date-desc':
-          return b.date - a.date;
-        case 'date-asc':
-          return a.date - b.date;
-        case 'amount-desc':
-          return b.amount - a.amount;
-        case 'amount-asc':
-          return a.amount - b.amount;
-        default:
-          return 0;
+    const startDate = startOfMonth(new Date(dateFilter.year, dateFilter.month));
+    const endDate = endOfMonth(new Date(dateFilter.year, dateFilter.month));
+
+    return transactions
+      .filter((transaction) => {
+        const transactionDate = new Date(transaction.date);
+        return transactionDate >= startDate && transactionDate <= endDate;
+      })
+      .sort((a, b) => b.date - a.date); // Sort by date, newest first
+  }, [transactions, dateFilter]);
+
+  // Group transactions by day
+  const transactionsByDay = useMemo(() => {
+    const grouped = new Map<string, Transaction[]>();
+
+    filteredTransactions.forEach((transaction) => {
+      const dateKey = format(new Date(transaction.date), 'yyyy-MM-dd');
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, []);
+      }
+      grouped.get(dateKey)!.push(transaction);
+    });
+
+    // Convert to array and sort by date (newest first)
+    return Array.from(grouped.entries()).sort(([dateA], [dateB]) => {
+      return parseISO(dateB).getTime() - parseISO(dateA).getTime();
+    });
+  }, [filteredTransactions]);
+
+  // Calculate daily totals
+  const getDailyTotal = (transactions: Transaction[]) => {
+    const totals = {
+      expense: 0,
+      income: 0,
+      transfer: 0,
+      investment: 0,
+      net: 0,
+    };
+
+    transactions.forEach((transaction) => {
+      const amount = transaction.amount;
+      switch (transaction.type) {
+        case 'expense':
+          totals.expense += amount;
+          totals.net -= amount;
+          break;
+        case 'income':
+          totals.income += amount;
+          totals.net += amount;
+          break;
+        case 'transfer':
+          totals.transfer += amount;
+          break;
+        case 'investment':
+          totals.investment += amount;
+          break;
       }
     });
 
-    setFilteredTransactions(result);
-  }, [transactions, searchTerm, filterType, sortOption]);
-
-  const formatCurrency = (amount: number, type: string) => {
-    const prefix = type === 'expense' ? '-' : type === 'income' ? '+' : '';
-    return `${prefix}$${Math.abs(amount).toFixed(2)}`;
+    return totals;
   };
 
-  const getTransactionColor = (type: string) => {
+  // Calculate monthly total
+  const monthlyTotal = useMemo(() => {
+    return getDailyTotal(filteredTransactions);
+  }, [filteredTransactions]);
+
+  // Load transactions when component mounts
+  useEffect(() => {
+    refreshTransactions();
+  }, [refreshTransactions]);
+
+  // Navigation to prev/next month
+  const goToPreviousMonth = () => {
+    setDateFilter((prev) => {
+      let newMonth = prev.month - 1;
+      let newYear = prev.year;
+
+      if (newMonth < 0) {
+        newMonth = 11;
+        newYear -= 1;
+      }
+
+      return { month: newMonth, year: newYear };
+    });
+  };
+
+  const goToNextMonth = () => {
+    setDateFilter((prev) => {
+      let newMonth = prev.month + 1;
+      let newYear = prev.year;
+
+      if (newMonth > 11) {
+        newMonth = 0;
+        newYear += 1;
+      }
+
+      return { month: newMonth, year: newYear };
+    });
+  };
+
+  // Utility function to format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  // Get color class based on transaction type
+  const getTransactionColor = (type: TransactionType) => {
     switch (type) {
       case 'expense':
         return 'text-red-600';
@@ -91,9 +201,16 @@ export default function TransactionsPage() {
         return 'text-green-600';
       case 'transfer':
         return 'text-blue-600';
+      case 'investment':
+        return 'text-purple-600';
       default:
         return '';
     }
+  };
+
+  // Find tag details from ID
+  const getTagById = (tagId: string): TransactionTag | undefined => {
+    return tags.find((tag) => tag.id === tagId);
   };
 
   return (
@@ -107,63 +224,117 @@ export default function TransactionsPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 mb-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-grow">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search transactions..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
+      {/* Month and Year Navigation */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex items-center space-x-4 mb-4 md:mb-0">
+              <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+
+              <div className="flex items-center space-x-2">
+                <Select
+                  value={dateFilter.month.toString()}
+                  onValueChange={(value) =>
+                    setDateFilter((prev) => ({
+                      ...prev,
+                      month: parseInt(value),
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {months.map((month) => (
+                      <SelectItem
+                        key={month.value}
+                        value={month.value.toString()}
+                      >
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={dateFilter.year.toString()}
+                  onValueChange={(value) =>
+                    setDateFilter((prev) => ({
+                      ...prev,
+                      year: parseInt(value),
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goToNextMonth}
+                disabled={
+                  dateFilter.month === getMonth(currentDate) &&
+                  dateFilter.year === getYear(currentDate)
+                }
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
+              <div className="text-center">
+                <div className="text-sm font-medium text-muted-foreground">
+                  Income
+                </div>
+                <div className="text-lg font-semibold text-green-600">
+                  {formatCurrency(monthlyTotal.income)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-muted-foreground">
+                  Expenses
+                </div>
+                <div className="text-lg font-semibold text-red-600">
+                  {formatCurrency(monthlyTotal.expense)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-muted-foreground">
+                  Transfers
+                </div>
+                <div className="text-lg font-semibold text-blue-600">
+                  {formatCurrency(monthlyTotal.transfer)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-muted-foreground">
+                  Net
+                </div>
+                <div
+                  className={cn(
+                    'text-lg font-semibold',
+                    monthlyTotal.net >= 0 ? 'text-green-600' : 'text-red-600'
+                  )}
+                >
+                  {formatCurrency(monthlyTotal.net)}
+                </div>
+              </div>
+            </div>
           </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Filter className="mr-2 h-4 w-4" /> Filter
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setFilterType(null)}>
-                All Types
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType('expense')}>
-                Expenses Only
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType('income')}>
-                Income Only
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType('transfer')}>
-                Transfers Only
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <ArrowUpDown className="mr-2 h-4 w-4" /> Sort
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setSortOption('date-desc')}>
-                Newest First
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortOption('date-asc')}>
-                Oldest First
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortOption('amount-desc')}>
-                Highest Amount
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortOption('amount-asc')}>
-                Lowest Amount
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {loading ? (
         <div className="grid gap-4">
@@ -187,62 +358,116 @@ export default function TransactionsPage() {
           <CardHeader>
             <CardTitle>No Transactions Found</CardTitle>
             <CardDescription>
-              {searchTerm || filterType
-                ? 'Try changing your search or filter criteria'
-                : "You haven't recorded any transactions yet"}
+              No transactions for {months[dateFilter.month].label}{' '}
+              {dateFilter.year}
             </CardDescription>
           </CardHeader>
           <CardFooter className="justify-center">
             <Link href="/transactions/new">
-              <Button>Add Your First Transaction</Button>
+              <Button>Add Transaction</Button>
             </Link>
           </CardFooter>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {filteredTransactions.map((transaction) => (
-            <Link href={`/transactions/${transaction.id}`} key={transaction.id}>
-              <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">
-                        {transaction.payeeName || 'Unknown Payee'}
-                      </CardTitle>
-                      <CardDescription>
-                        {new Date(transaction.date).toLocaleDateString()}
-                      </CardDescription>
-                    </div>
-                    <span
-                      className={cn(
-                        'text-lg font-semibold',
-                        getTransactionColor(transaction.type)
-                      )}
-                    >
-                      {formatCurrency(transaction.amount, transaction.type)}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="pb-2">
-                  <p className="text-sm text-gray-600">
-                    {transaction.description || 'No description'}
-                  </p>
-                </CardContent>
-                <CardFooter className="pt-2">
-                  <div className="flex flex-wrap gap-2">
-                    {transaction.isRecurring && (
-                      <Badge variant="outline">Recurring</Badge>
+        <div className="space-y-6">
+          {transactionsByDay.map(([dateKey, dayTransactions]) => {
+            const displayDate = format(new Date(dateKey), 'EEEE, MMMM d, yyyy');
+            const dailyTotal = getDailyTotal(dayTransactions);
+
+            return (
+              <div key={dateKey} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">{displayDate}</h3>
+                  <div
+                    className={cn(
+                      'font-medium',
+                      dailyTotal.net >= 0 ? 'text-green-600' : 'text-red-600'
                     )}
-                    {transaction.tags?.map((tag, index) => (
-                      <Badge key={index} variant="secondary">
-                        {tag}
-                      </Badge>
-                    ))}
+                  >
+                    Net: {formatCurrency(dailyTotal.net)}
                   </div>
-                </CardFooter>
-              </Card>
-            </Link>
-          ))}
+                </div>
+
+                <div className="grid gap-2">
+                  {dayTransactions.map((transaction) => (
+                    <Link
+                      href={`/transactions/${transaction.id}`}
+                      key={transaction.id}
+                    >
+                      <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                              <div className="font-medium">
+                                {transaction.payeeName || 'Unknown Payee'}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {transaction.description || 'No description'}
+                              </div>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {transaction.isRecurring && (
+                                  <Badge
+                                    variant="outline"
+                                    className="flex items-center gap-1"
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="12"
+                                      height="12"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                      <path d="M3 3v5h5" />
+                                    </svg>
+                                    Recurring
+                                  </Badge>
+                                )}
+                                {transaction.tags?.map((tagId) => {
+                                  const tag = getTagById(tagId);
+                                  return tag ? (
+                                    <Badge
+                                      key={tagId}
+                                      style={{
+                                        backgroundColor: tag.color,
+                                        color: 'white',
+                                      }}
+                                    >
+                                      {tag.name}
+                                    </Badge>
+                                  ) : null;
+                                })}
+                              </div>
+                            </div>
+                            <span
+                              className={cn(
+                                'text-lg font-semibold',
+                                getTransactionColor(transaction.type)
+                              )}
+                            >
+                              {transaction.type === 'expense'
+                                ? '-'
+                                : transaction.type === 'income'
+                                ? '+'
+                                : ''}
+                              {formatCurrency(transaction.amount).replace(
+                                '$',
+                                ''
+                              )}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
