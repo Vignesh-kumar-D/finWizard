@@ -1,4 +1,3 @@
-// app/transactions/new/components/ReceiptUpload.tsx
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { Image as ImageIcon } from 'lucide-react';
@@ -62,11 +61,14 @@ export function ReceiptUpload({
       </div>
 
       {imagePreview && (
-        <div className="mt-2 relative">
+        <div className="mt-2 relative h-48 w-auto max-w-full">
           <Image
             src={imagePreview}
             alt="Receipt preview"
-            className="max-h-48 rounded-md border"
+            fill
+            style={{ objectFit: 'contain' }}
+            className="rounded-md border"
+            unoptimized // This is important for data URLs
           />
         </div>
       )}

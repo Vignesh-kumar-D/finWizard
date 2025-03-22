@@ -45,8 +45,8 @@ import { cn } from '@/lib/utils';
 
 export default function TransactionDetailPage() {
   const router = useRouter();
-  const params = useParams();
-  const id = params.id as string;
+  const params = useParams<{id:string}>();
+  const id = params.id ;
 
   const { getTransaction, removeTransaction, tags } = useTransactions();
   const { accounts } = useAccounts();
