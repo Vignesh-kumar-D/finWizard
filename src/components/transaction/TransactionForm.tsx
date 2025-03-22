@@ -1,4 +1,4 @@
-// app/transactions/new/page.tsx
+// components/transaction/TransactionForm.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -11,6 +11,7 @@ import {
   RecurrenceFrequency,
   transactionFormSchema,
   TransactionFormValues,
+  Transaction,
 } from '@/types/transaction';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,6 +28,7 @@ import {
 import { Form } from '@/components/ui/form';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Import our custom components
 import {
@@ -41,8 +43,6 @@ import {
   RecurringOptions,
 } from '@/components/transaction';
 import { useFirebase } from '@/lib/firebase/firebase-context';
-
-// Define Zod schema for transaction form
 
 // Add conditional validation based on transaction type
 const transactionFormValidator = z
@@ -88,15 +88,30 @@ const transactionFormValidator = z
     return result;
   });
 
-// Type inference from schema
+interface TransactionFormProps {
+  id?: string; // Optional ID for editing existing transaction
+}
 
-export default function TransactionForm() {
+export default function TransactionForm({ id }: TransactionFormProps) {
   const router = useRouter();
-  const { addTransaction, addPayee, payees, tags, addTag, createRecurring } =
-    useTransactions();
+  const {
+    addTransaction,
+    editTransaction,
+    getTransaction,
+    addPayee,
+    payees,
+    tags,
+    addTag,
+    createRecurring,
+  } = useTransactions();
   const { currentUser } = useFirebase();
   const { accounts } = useAccounts();
   const { categories } = useBudgets();
+
+  // State for tracking if we're in edit mode
+  const isEditMode = !!id;
+  const [isLoading, setIsLoading] = useState<boolean>(!!id);
+  const [, setOriginalTransaction] = useState<Transaction | null>(null);
 
   // State for handling payee selection/creation
   const [selectedPayee, setSelectedPayee] = useState<string>('');
@@ -107,6 +122,11 @@ export default function TransactionForm() {
 
   // State for handling receipt image
   const [receiptImage, setReceiptImage] = useState<File | null>(null);
+  const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(
+    null
+  );
+  const [removeExistingReceipt, setRemoveExistingReceipt] =
+    useState<boolean>(false);
 
   // State for handling recurring transaction
   const [isRecurring, setIsRecurring] = useState<boolean>(false);
@@ -133,10 +153,67 @@ export default function TransactionForm() {
     mode: 'onChange',
   });
 
+  // Fetch transaction data if in edit mode
+  useEffect(() => {
+    if (id) {
+      const fetchTransaction = async () => {
+        try {
+          setIsLoading(true);
+          const data = await getTransaction(id);
+
+          if (data) {
+            setOriginalTransaction(data);
+
+            // Populate form with transaction data
+            form.reset({
+              type: data.type,
+              amount: data.amount.toString(),
+              date: new Date(data.date),
+              accountId: data.accountId,
+              toAccountId: data.toAccountId || '',
+              categoryId: data.categoryId || '',
+              paymentMethod: data.paymentMethod || 'card',
+              description: data.description || '',
+            });
+
+            // Set other state values
+            setSelectedPayee(data.payeeId || '');
+            setNewPayeeName(data.payeeName || '');
+            setSelectedTags(data.tags || []);
+            setIsRecurring(data.isRecurring);
+            setExistingReceiptUrl(data.receiptImageUrl || null);
+
+            // If it's a recurring transaction, we would need to fetch the recurring details
+            if (data.isRecurring && data.recurringId) {
+              // You would need to implement a getRecurringTransaction function
+              // const recurringData = await getRecurringTransaction(data.recurringId);
+              // setRecurringFrequency(recurringData.frequency);
+              // setRecurringEndDate(recurringData.endDate ? new Date(recurringData.endDate) : null);
+            }
+          } else {
+            toast.error('Transaction not found');
+            router.push('/transactions');
+          }
+        } catch (error) {
+          console.error('Error fetching transaction:', error);
+          toast.error('Failed to load transaction');
+          router.push('/transactions');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchTransaction();
+    }
+  }, [id, getTransaction, router, form]);
+
   const transactionType = form.watch('type');
 
   // Prefill account if there's only one option
   useEffect(() => {
+    // Skip this if we're in edit mode and still loading the transaction
+    if (isEditMode && isLoading) return;
+
     const filteredAccounts = accounts.filter((account) => {
       if (transactionType === 'expense') {
         return (
@@ -155,7 +232,7 @@ export default function TransactionForm() {
     if (filteredAccounts.length === 1 && !form.getValues('accountId')) {
       form.setValue('accountId', filteredAccounts[0].id);
     }
-  }, [accounts, form, transactionType]);
+  }, [accounts, form, transactionType, isEditMode, isLoading]);
 
   // Handle form submission
   const onSubmit = async (data: TransactionFormValues) => {
@@ -188,69 +265,90 @@ export default function TransactionForm() {
         setIsSubmitting(false);
         return;
       }
-      // Format the data for submission
-      const transaction = {
-        userId: currentUser?.uid ?? '', // Will be set by the server
-        date: data.date.getTime(),
-        amount: parseFloat(data.amount),
-        type: data.type,
-        categoryId: data.categoryId || '',
-        accountId: data.accountId,
-        toAccountId: data.type === 'transfer' ? data.toAccountId : null,
-        payeeId: selectedPayee || null,
-        payeeName: newPayeeName.trim() ? newPayeeName.trim() : null,
-        paymentMethod: data.paymentMethod,
-        description: data.description,
-        tags: selectedTags.length > 0 ? selectedTags : [],
-        isPlanned: false,
-        isRecurring: isRecurring,
-        recurringId: '',
-        receiptImageUrl: '',
-      };
 
-      // If it's a recurring transaction, create that first
-      if (isRecurring) {
-        const recurring = {
-          userId: currentUser?.uid ?? '', // Will be set by the server
-          title: `${transaction.payeeName || 'Transaction'} (${
-            transaction.amount
-          })`,
-          amount: transaction.amount,
-          type: transaction.type,
-          categoryId: transaction.categoryId,
-          accountId: transaction.accountId,
-          toAccountId: transaction.toAccountId,
-          payeeId: transaction.payeeId,
-          payeeName: transaction.payeeName,
-          paymentMethod: transaction.paymentMethod,
-          description: transaction.description,
-          tags: transaction.tags,
-          frequency: recurringFrequency,
-          startDate: transaction.date,
-          endDate: recurringEndDate ? recurringEndDate.getTime() : null,
-          nextDueDate: transaction.date,
-          isActive: true,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+      if (isEditMode && id) {
+        // We're editing an existing transaction
+        const updatedTransaction = {
+          type: data.type,
+          date: data.date.getTime(),
+          amount: parseFloat(data.amount),
+          categoryId: data.categoryId || '',
+          accountId: data.accountId,
+          toAccountId: data.type === 'transfer' ? data.toAccountId : null,
+          payeeId: selectedPayee || null,
+          payeeName:
+            !selectedPayee && newPayeeName.trim() ? newPayeeName.trim() : null,
+          paymentMethod: data.paymentMethod,
+          description: data.description,
+          tags: selectedTags.length > 0 ? selectedTags : [],
+          // Set receiptImageUrl to null if we're removing the existing receipt
+          receiptImageUrl: removeExistingReceipt || null,
         };
 
-        const createdRecurring = await createRecurring(recurring);
-        transaction.recurringId = createdRecurring.id;
+        await editTransaction(id, updatedTransaction, receiptImage);
+        toast.success('Transaction updated');
+        router.push(`/transactions/${id}`);
+      } else {
+        // We're creating a new transaction
+        const transaction = {
+          userId: currentUser?.uid ?? '',
+          date: data.date.getTime(),
+          amount: parseFloat(data.amount),
+          type: data.type,
+          categoryId: data.categoryId || '',
+          accountId: data.accountId,
+          toAccountId: data.type === 'transfer' ? data.toAccountId : null,
+          payeeId: selectedPayee || null,
+          payeeName: newPayeeName.trim() ? newPayeeName.trim() : null,
+          paymentMethod: data.paymentMethod,
+          description: data.description,
+          tags: selectedTags.length > 0 ? selectedTags : [],
+          isPlanned: false,
+          isRecurring: isRecurring,
+          recurringId: '',
+          receiptImageUrl: '',
+        };
+
+        // If it's a recurring transaction, create that first
+        if (isRecurring) {
+          const recurring = {
+            userId: currentUser?.uid ?? '',
+            title: `${transaction.payeeName || 'Transaction'} (${
+              transaction.amount
+            })`,
+            amount: transaction.amount,
+            type: transaction.type,
+            categoryId: transaction.categoryId,
+            accountId: transaction.accountId,
+            toAccountId: transaction.toAccountId ?? null,
+            payeeId: transaction.payeeId,
+            payeeName: transaction.payeeName,
+            paymentMethod: transaction.paymentMethod,
+            description: transaction.description,
+            tags: transaction.tags,
+            frequency: recurringFrequency,
+            startDate: transaction.date,
+            endDate: recurringEndDate ? recurringEndDate.getTime() : null,
+            nextDueDate: transaction.date,
+            isActive: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+
+          const createdRecurring = await createRecurring(recurring);
+          transaction.recurringId = createdRecurring.id;
+        }
+
+        await addTransaction(transaction, receiptImage || undefined);
+        toast.success('Transaction created');
+        router.push('/transactions');
       }
-
-      // Create the transaction
-      await addTransaction(transaction, receiptImage || undefined);
-
-      // Show success toast
-      toast.success('Transaction created');
-
-      // Navigate back to transactions list
-      router.push('/transactions');
     } catch (error) {
-      console.error('Error creating transaction:', error);
-
-      // Show error toast
-      toast.error('Error creating transaction');
+      console.error(
+        `Error ${isEditMode ? 'updating' : 'creating'} transaction:`,
+        error
+      );
+      toast.error(`Error ${isEditMode ? 'updating' : 'creating'} transaction`);
     } finally {
       setIsSubmitting(false);
     }
@@ -262,7 +360,7 @@ export default function TransactionForm() {
 
     try {
       const newPayee = await addPayee({
-        userId: currentUser?.uid ?? '', // Will be set by the server
+        userId: currentUser?.uid ?? '',
         name: payeeName,
         type: 'person',
       });
@@ -275,9 +373,7 @@ export default function TransactionForm() {
       return newPayee;
     } catch (error) {
       console.error('Error adding payee:', error);
-
       toast.error('Error adding payee');
-
       return null;
     }
   };
@@ -288,32 +384,63 @@ export default function TransactionForm() {
 
     try {
       const newTag = await addTag({
-        userId: '', // Will be set by the server
+        userId: currentUser?.uid ?? '',
         name: tagName,
         color: tagColor,
       });
 
       setSelectedTags([...selectedTags, newTag.id]);
-
       toast.success('Tag added');
-
       return newTag;
     } catch (error) {
       console.error('Error adding tag:', error);
-
       toast.error('Error adding tag');
-
       return null;
     }
   };
+
+  // Handle receipt removal
+  const handleReceiptRemoval = () => {
+    setReceiptImage(null);
+    setRemoveExistingReceipt(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8 max-w-2xl">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <Skeleton className="h-10 w-full" />
+              <div className="grid grid-cols-2 gap-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 max-w-2xl">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Add New Transaction</CardTitle>
+          <CardTitle className="text-2xl">
+            {isEditMode ? 'Edit Transaction' : 'Add New Transaction'}
+          </CardTitle>
           <CardDescription>
-            Record a new expense, income, or transfer between accounts
+            {isEditMode
+              ? 'Update the details of your transaction'
+              : 'Record a new expense, income, or transfer between accounts'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -321,7 +448,8 @@ export default function TransactionForm() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               {/* Transaction Type Tabs */}
               <Tabs
-                defaultValue="expense"
+                defaultValue={form.getValues('type')}
+                value={transactionType}
                 onValueChange={(value) => {
                   form.setValue('type', value as TransactionType);
 
@@ -394,24 +522,34 @@ export default function TransactionForm() {
               <ReceiptUpload
                 receiptImage={receiptImage}
                 setReceiptImage={setReceiptImage}
+                existingImageUrl={
+                  !removeExistingReceipt ? existingReceiptUrl : null
+                }
+                onRemove={handleReceiptRemoval}
               />
 
-              {/* Recurring Transaction Options */}
-              <RecurringOptions
-                isRecurring={isRecurring}
-                setIsRecurring={setIsRecurring}
-                recurringFrequency={recurringFrequency}
-                setRecurringFrequency={setRecurringFrequency}
-                recurringEndDate={recurringEndDate}
-                setRecurringEndDate={setRecurringEndDate}
-              />
+              {/* Recurring Transaction Options - only show for new transactions */}
+              {!isEditMode && (
+                <RecurringOptions
+                  isRecurring={isRecurring}
+                  setIsRecurring={setIsRecurring}
+                  recurringFrequency={recurringFrequency}
+                  setRecurringFrequency={setRecurringFrequency}
+                  recurringEndDate={recurringEndDate}
+                  setRecurringEndDate={setRecurringEndDate}
+                />
+              )}
 
               {/* Submit Buttons */}
               <div className="flex justify-end gap-4 pt-4">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.push('/transactions')}
+                  onClick={() =>
+                    router.push(
+                      isEditMode ? `/transactions/${id}` : '/transactions'
+                    )
+                  }
                   disabled={isSubmitting}
                 >
                   Cancel
@@ -441,6 +579,8 @@ export default function TransactionForm() {
                       </svg>
                       Saving...
                     </>
+                  ) : isEditMode ? (
+                    'Update Transaction'
                   ) : isRecurring ? (
                     'Save & Create Recurring'
                   ) : (

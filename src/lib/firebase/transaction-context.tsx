@@ -152,7 +152,7 @@ export const TransactionProvider = ({
     transaction: Partial<
       Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
     >,
-    receiptImage?: File
+    receiptImage?: File | null
   ) => {
     await updateTransaction(id, transaction, receiptImage);
     await refreshTransactions();

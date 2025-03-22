@@ -222,7 +222,7 @@ export const createTransaction = async (
 export const updateTransaction = async (
   transactionId: string,
   transactionData: Partial<Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>>,
-  receiptImage?: File
+  receiptImage?: File | null
 ): Promise<void> => {
   try {
     // Upload receipt image if provided

@@ -1,16 +1,23 @@
+// components/transaction/ReceiptUpload.tsx
 import React, { useState } from 'react';
-import Image from 'next/image';
 import { Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FormLabel } from '@/components/ui/form';
+import Image from 'next/image';
+
+interface ReceiptUploadProps {
+  receiptImage: File | null;
+  setReceiptImage: (file: File | null) => void;
+  existingImageUrl?: string | null;
+  onRemove?: () => void;
+}
 
 export function ReceiptUpload({
   receiptImage,
   setReceiptImage,
-}: {
-  receiptImage: File | null;
-  setReceiptImage: (file: File | null) => void;
-}) {
+  existingImageUrl,
+  onRemove,
+}: ReceiptUploadProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,6 +34,16 @@ export function ReceiptUpload({
     }
   };
 
+  const handleRemove = () => {
+    setReceiptImage(null);
+    setImagePreview(null);
+    if (onRemove) {
+      onRemove();
+    }
+  };
+
+  const hasImage = receiptImage || existingImageUrl;
+
   return (
     <div className="space-y-2">
       <FormLabel>Receipt Image (Optional)</FormLabel>
@@ -37,17 +54,10 @@ export function ReceiptUpload({
           onClick={() => document.getElementById('receipt-upload')?.click()}
         >
           <ImageIcon className="h-4 w-4 mr-2" />
-          {receiptImage ? 'Change Image' : 'Upload Image'}
+          {hasImage ? 'Change Image' : 'Upload Image'}
         </Button>
-        {receiptImage && (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setReceiptImage(null);
-              setImagePreview(null);
-            }}
-          >
+        {hasImage && (
+          <Button type="button" variant="ghost" onClick={handleRemove}>
             Remove
           </Button>
         )}
@@ -60,18 +70,29 @@ export function ReceiptUpload({
         />
       </div>
 
-      {imagePreview && (
-        <div className="mt-2 relative h-48 w-auto max-w-full">
+      {imagePreview ? (
+        <div className="mt-2 relative h-48">
           <Image
             src={imagePreview}
             alt="Receipt preview"
+            className="rounded-md border"
             fill
             style={{ objectFit: 'contain' }}
-            className="rounded-md border"
             unoptimized // This is important for data URLs
           />
         </div>
-      )}
+      ) : existingImageUrl ? (
+        <div className="mt-2 relative h-48">
+          <Image
+            src={existingImageUrl}
+            alt="Receipt"
+            fill
+            style={{ objectFit: 'contain' }}
+            className=" rounded-md border"
+            unoptimized // This is important for data URLs
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
