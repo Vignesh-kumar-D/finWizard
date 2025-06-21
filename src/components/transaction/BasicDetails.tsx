@@ -35,10 +35,10 @@ export function TransactionBasicDetails({
           <FormItem>
             <FormLabel>Amount</FormLabel>
             <FormControl>
-              <div className="relative">
-                <span className="absolute left-3 top-3">$</span>
+              <div>
                 <Input
-                  placeholder="0.00"
+                  prefix="₹"
+                  placeholder="₹ 0.00"
                   {...field}
                   type="number"
                   step="0.01"

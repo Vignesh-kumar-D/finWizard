@@ -282,10 +282,14 @@ export default function TransactionForm({ id }: TransactionFormProps) {
           description: data.description,
           tags: selectedTags.length > 0 ? selectedTags : [],
           // Set receiptImageUrl to null if we're removing the existing receipt
-          receiptImageUrl: removeExistingReceipt || null,
+          receiptImageUrl: removeExistingReceipt ? '' : null,
         };
 
-        await editTransaction(id, updatedTransaction, receiptImage);
+        await editTransaction(
+          id,
+          updatedTransaction,
+          receiptImage || undefined
+        );
         toast.success('Transaction updated');
         router.push(`/transactions/${id}`);
       } else {

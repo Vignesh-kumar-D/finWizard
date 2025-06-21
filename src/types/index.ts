@@ -190,6 +190,7 @@ export interface Group {
   createdBy: string; // userId
   createdAt: number; // Timestamp
   members: GroupMember[];
+  expenses: SharedExpense[];
 }
 
 export interface GroupMember {

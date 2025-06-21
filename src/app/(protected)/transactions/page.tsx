@@ -36,15 +36,13 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { cn } from '@/lib/utils';
-import { z } from 'zod';
 
 // Define schema for date filter
-export const DateFilterSchema = z.object({
-  month: z.number().min(0).max(11),
-  year: z.number().min(1900).max(2100),
-});
 
-type DateFilter = z.infer<typeof DateFilterSchema>;
+type DateFilter = {
+  month: number;
+  year: number;
+};
 
 export default function TransactionsPage() {
   const { transactions, loading, refreshTransactions, tags } =
@@ -188,7 +186,7 @@ export default function TransactionsPage() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'INR',
     }).format(amount);
   };
 
@@ -455,7 +453,7 @@ export default function TransactionsPage() {
                                 ? '+'
                                 : ''}
                               {formatCurrency(transaction.amount).replace(
-                                '$',
+                                '₹',
                                 ''
                               )}
                             </span>

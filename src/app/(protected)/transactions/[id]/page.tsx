@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Image from 'next/image';
 import {
   ArrowLeftCircle,
   Calendar,
@@ -45,8 +46,8 @@ import { cn } from '@/lib/utils';
 
 export default function TransactionDetailPage() {
   const router = useRouter();
-  const params = useParams<{id:string}>();
-  const id = params.id ;
+  const params = useParams<{ id: string }>();
+  const id = params.id;
 
   const { getTransaction, removeTransaction, tags } = useTransactions();
   const { accounts } = useAccounts();
@@ -99,7 +100,7 @@ export default function TransactionDetailPage() {
 
   const formatCurrency = (amount: number, type: string) => {
     const prefix = type === 'expense' ? '-' : type === 'income' ? '+' : '';
-    return `${prefix}$${Math.abs(amount).toFixed(2)}`;
+    return `${prefix}₹${Math.abs(amount).toFixed(2)}`;
   };
 
   const getTransactionColor = (type: string) => {
@@ -326,7 +327,7 @@ export default function TransactionDetailPage() {
           {transaction.receiptImageUrl && (
             <div className="pt-4 border-t">
               <div className="font-medium mb-2">Receipt</div>
-              <img
+              <Image
                 src={transaction.receiptImageUrl}
                 alt="Receipt"
                 className="max-h-64 rounded-md border mx-auto"
