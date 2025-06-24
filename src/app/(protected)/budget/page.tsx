@@ -38,9 +38,9 @@ import { toast } from 'sonner';
 // Helper components
 function BudgetCard({ budget }: { budget: BudgetWithCategory }) {
   const statusColors = {
-    under: 'text-green-600',
-    'on-track': 'text-blue-600',
-    over: 'text-red-600',
+    under: 'text-income',
+    'on-track': 'text-primary',
+    over: 'text-expense',
   };
 
   const statusText = {
@@ -50,14 +50,14 @@ function BudgetCard({ budget }: { budget: BudgetWithCategory }) {
   };
 
   const progressColors = {
-    under: 'bg-green-600',
-    'on-track': 'bg-blue-600',
-    over: 'bg-red-600',
+    under: 'bg-income',
+    'on-track': 'bg-primary',
+    over: 'bg-expense',
   };
   const IconComponent = lucideIcons[budget.category.icon];
 
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+    <Card className="overflow-hidden hover:shadow-md transition-shadow dashboard-card">
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center">
@@ -258,9 +258,9 @@ export default function BudgetPage() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {/* Expense Summary */}
-            <Card className="bg-gradient-to-br from-red-50 to-white border-red-100">
+            <Card className="financial-stat stat-expense">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center text-red-700">
+                <CardTitle className="text-lg flex items-center text-expense">
                   <ArrowDownRight className="mr-2 h-5 w-5" />
                   Expenses
                 </CardTitle>
@@ -281,7 +281,7 @@ export default function BudgetPage() {
                       ? (summary.expenseTotal / summary.expensePlanned) * 100
                       : 0
                   }
-                  className="h-1 mt-2 bg-red-100"
+                  className="h-1 mt-2 bg-expense/20"
                 />
                 <p className="text-sm mt-2 text-muted-foreground">
                   {summary?.expensePlanned &&
@@ -298,9 +298,9 @@ export default function BudgetPage() {
             </Card>
 
             {/* Savings Summary */}
-            <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100">
+            <Card className="financial-stat stat-savings">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center text-blue-700">
+                <CardTitle className="text-lg flex items-center text-savings">
                   <IndianRupee className="mr-2 h-5 w-5" />
                   Savings
                 </CardTitle>
@@ -321,7 +321,7 @@ export default function BudgetPage() {
                       ? (summary.savingsTotal / summary.savingsPlanned) * 100
                       : 0
                   }
-                  className="h-1 mt-2 bg-blue-100"
+                  className="h-1 mt-2 bg-savings/20"
                 />
                 <p className="text-sm mt-2 text-muted-foreground">
                   {summary?.savingsPlanned &&
@@ -338,9 +338,9 @@ export default function BudgetPage() {
             </Card>
 
             {/* Investment Summary */}
-            <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-100">
+            <Card className="financial-stat stat-investment">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center text-purple-700">
+                <CardTitle className="text-lg flex items-center text-investment">
                   <TrendingUp className="mr-2 h-5 w-5" />
                   Investments
                 </CardTitle>
@@ -362,7 +362,7 @@ export default function BudgetPage() {
                         100
                       : 0
                   }
-                  className="h-1 mt-2 bg-purple-100"
+                  className="h-1 mt-2 bg-investment/20"
                 />
                 <p className="text-sm mt-2 text-muted-foreground">
                   {summary?.investmentPlanned &&
@@ -389,7 +389,7 @@ export default function BudgetPage() {
             </TabsList>
             <TabsContent value="all">
               {budgets.length === 0 ? (
-                <Card>
+                <Card className="dashboard-card">
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <ArrowUpRight className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-xl font-medium mb-2">No budgets</h3>
@@ -417,7 +417,7 @@ export default function BudgetPage() {
             </TabsContent>
             <TabsContent value="expense">
               {getBudgetsByType('expense').length === 0 ? (
-                <Card>
+                <Card className="dashboard-card">
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <PieChart className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-xl font-medium mb-2">
@@ -448,7 +448,7 @@ export default function BudgetPage() {
 
             <TabsContent value="income">
               {getBudgetsByType('income').length === 0 ? (
-                <Card>
+                <Card className="dashboard-card">
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <ArrowUpRight className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-xl font-medium mb-2">
@@ -479,7 +479,7 @@ export default function BudgetPage() {
 
             <TabsContent value="investment">
               {getBudgetsByType('investment').length === 0 ? (
-                <Card>
+                <Card className="dashboard-card">
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-xl font-medium mb-2">
