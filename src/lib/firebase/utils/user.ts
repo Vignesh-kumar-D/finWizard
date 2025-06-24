@@ -8,6 +8,10 @@ import {
   setDoc,
   updateDoc,
   where,
+  orderBy,
+  limit,
+  startAfter,
+  QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../config';
 import { AuthMethod, UserProfile } from '@/types';
@@ -66,6 +70,243 @@ export const findUserByPhone = async (
     } as UserProfile;
   } catch (error) {
     console.error('Error finding user by phone:', error);
+    throw error;
+  }
+};
+
+/**
+ * Searches users by name (case-insensitive partial match)
+ * @param name User's name to search for
+ * @param limit Number of results to return (default: 10)
+ * @returns Array of UserProfile objects
+ */
+export const searchUsersByName = async (
+  name: string,
+  limitCount: number = 10
+): Promise<UserProfile[]> => {
+  try {
+    if (!name || name.trim().length < 2) return [];
+
+    const usersRef = collection(db, 'users');
+    const q = query(
+      usersRef,
+      where('name', '>=', name.toLowerCase()),
+      where('name', '<=', name.toLowerCase() + '\uf8ff'),
+      orderBy('name'),
+      limit(limitCount)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as UserProfile[];
+  } catch (error) {
+    console.error('Error searching users by name:', error);
+    throw error;
+  }
+};
+
+/**
+ * Comprehensive user search by email, phone, or name
+ * @param searchTerm Search term (email, phone, or name)
+ * @param limit Number of results to return (default: 10)
+ * @returns Array of UserProfile objects
+ */
+export const searchUsers = async (
+  searchTerm: string,
+  limitCount: number = 10
+): Promise<UserProfile[]> => {
+  try {
+    if (!searchTerm || searchTerm.trim().length < 2) return [];
+
+    const term = searchTerm.trim().toLowerCase();
+    const usersRef = collection(db, 'users');
+    const results: UserProfile[] = [];
+    const seenIds = new Set<string>();
+
+    // Search by email
+    try {
+      const emailQuery = query(
+        usersRef,
+        where('email', '>=', term),
+        where('email', '<=', term + '\uf8ff'),
+        limit(limitCount)
+      );
+      const emailSnapshot = await getDocs(emailQuery);
+
+      emailSnapshot.docs.forEach((doc) => {
+        if (!seenIds.has(doc.id)) {
+          seenIds.add(doc.id);
+          results.push({
+            id: doc.id,
+            ...doc.data(),
+          } as UserProfile);
+        }
+      });
+    } catch (error) {
+      console.warn('Email search failed:', error);
+    }
+
+    // Search by phone number
+    try {
+      const phoneQuery = query(
+        usersRef,
+        where('phoneNumber', '>=', term),
+        where('phoneNumber', '<=', term + '\uf8ff'),
+        limit(limitCount)
+      );
+      const phoneSnapshot = await getDocs(phoneQuery);
+
+      phoneSnapshot.docs.forEach((doc) => {
+        if (!seenIds.has(doc.id)) {
+          seenIds.add(doc.id);
+          results.push({
+            id: doc.id,
+            ...doc.data(),
+          } as UserProfile);
+        }
+      });
+    } catch (error) {
+      console.warn('Phone search failed:', error);
+    }
+
+    // Search by name
+    try {
+      const nameQuery = query(
+        usersRef,
+        where('name', '>=', term),
+        where('name', '<=', term + '\uf8ff'),
+        limit(limitCount)
+      );
+      const nameSnapshot = await getDocs(nameQuery);
+
+      nameSnapshot.docs.forEach((doc) => {
+        if (!seenIds.has(doc.id)) {
+          seenIds.add(doc.id);
+          results.push({
+            id: doc.id,
+            ...doc.data(),
+          } as UserProfile);
+        }
+      });
+    } catch (error) {
+      console.warn('Name search failed:', error);
+    }
+
+    // Remove duplicates and limit results
+    return results.slice(0, limitCount);
+  } catch (error) {
+    console.error('Error in comprehensive user search:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets all users with pagination
+ * @param pageSize Number of users per page (default: 20)
+ * @param lastDoc Last document for pagination
+ * @returns Object containing users array and last document for next page
+ */
+export const getAllUsers = async (
+  pageSize: number = 20,
+  lastDoc?: QueryDocumentSnapshot
+): Promise<{
+  users: UserProfile[];
+  lastDoc: QueryDocumentSnapshot | null;
+}> => {
+  try {
+    const usersRef = collection(db, 'users');
+    let q = query(usersRef, orderBy('name'), limit(pageSize));
+
+    if (lastDoc) {
+      q = query(
+        usersRef,
+        orderBy('name'),
+        startAfter(lastDoc),
+        limit(pageSize)
+      );
+    }
+
+    const querySnapshot = await getDocs(q);
+    const users = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as UserProfile[];
+
+    const lastVisible =
+      querySnapshot.docs[querySnapshot.docs.length - 1] || null;
+
+    return {
+      users,
+      lastDoc: lastVisible,
+    };
+  } catch (error) {
+    console.error('Error getting all users:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets a user profile by ID
+ * @param userId User's ID
+ * @returns UserProfile if found, null otherwise
+ */
+export const getUserById = async (
+  userId: string
+): Promise<UserProfile | null> => {
+  try {
+    if (!userId) return null;
+
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) return null;
+
+    return {
+      id: userDoc.id,
+      ...userDoc.data(),
+    } as UserProfile;
+  } catch (error) {
+    console.error('Error getting user by ID:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets multiple users by their IDs
+ * @param userIds Array of user IDs
+ * @returns Array of UserProfile objects
+ */
+export const getUsersByIds = async (
+  userIds: string[]
+): Promise<UserProfile[]> => {
+  try {
+    if (!userIds.length) return [];
+
+    const users: UserProfile[] = [];
+
+    // Firestore doesn't support 'in' queries with more than 10 items
+    // So we'll batch them in groups of 10
+    const batchSize = 10;
+    for (let i = 0; i < userIds.length; i += batchSize) {
+      const batch = userIds.slice(i, i + batchSize);
+
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('__name__', 'in', batch));
+      const querySnapshot = await getDocs(q);
+
+      querySnapshot.docs.forEach((doc) => {
+        users.push({
+          id: doc.id,
+          ...doc.data(),
+        } as UserProfile);
+      });
+    }
+
+    return users;
+  } catch (error) {
+    console.error('Error getting users by IDs:', error);
     throw error;
   }
 };

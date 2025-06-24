@@ -33,9 +33,9 @@ export const getUserAccounts = async (userId: string): Promise<Account[]> => {
         type: data.type as AccountType,
         balance: data.balance,
         lastUpdated: data.lastUpdated?.toMillis() || Date.now(),
-        icon: data.icon || undefined,
+        icon: data.icon || '',
         isDefault: data.isDefault || false,
-        notes: data.notes || undefined,
+        notes: data.notes || '',
       });
     });
 
@@ -68,9 +68,9 @@ export const getAccountById = async (
       type: data.type as AccountType,
       balance: data.balance,
       lastUpdated: data.lastUpdated?.toMillis() || Date.now(),
-      icon: data.icon || undefined,
+      icon: data.icon || '',
       isDefault: data.isDefault || false,
-      notes: data.notes || undefined,
+      notes: data.notes || '',
     };
   } catch (error) {
     console.error('Error getting account:', error);

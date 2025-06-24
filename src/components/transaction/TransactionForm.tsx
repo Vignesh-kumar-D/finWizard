@@ -274,15 +274,15 @@ export default function TransactionForm({ id }: TransactionFormProps) {
           amount: parseFloat(data.amount),
           categoryId: data.categoryId || '',
           accountId: data.accountId,
-          toAccountId: data.type === 'transfer' ? data.toAccountId : null,
-          payeeId: selectedPayee || null,
+          toAccountId: data.type === 'transfer' ? data.toAccountId : '',
+          payeeId: selectedPayee || '',
           payeeName:
-            !selectedPayee && newPayeeName.trim() ? newPayeeName.trim() : null,
+            !selectedPayee && newPayeeName.trim() ? newPayeeName.trim() : '',
           paymentMethod: data.paymentMethod,
           description: data.description,
           tags: selectedTags.length > 0 ? selectedTags : [],
-          // Set receiptImageUrl to null if we're removing the existing receipt
-          receiptImageUrl: removeExistingReceipt ? '' : null,
+          // Set receiptImageUrl to empty string if we're removing the existing receipt
+          receiptImageUrl: removeExistingReceipt ? '' : '',
         };
 
         await editTransaction(
@@ -301,9 +301,9 @@ export default function TransactionForm({ id }: TransactionFormProps) {
           type: data.type,
           categoryId: data.categoryId || '',
           accountId: data.accountId,
-          toAccountId: data.type === 'transfer' ? data.toAccountId : null,
-          payeeId: selectedPayee || null,
-          payeeName: newPayeeName.trim() ? newPayeeName.trim() : null,
+          toAccountId: data.type === 'transfer' ? data.toAccountId : '',
+          payeeId: selectedPayee || '',
+          payeeName: newPayeeName.trim() ? newPayeeName.trim() : '',
           paymentMethod: data.paymentMethod,
           description: data.description,
           tags: selectedTags.length > 0 ? selectedTags : [],
@@ -324,7 +324,7 @@ export default function TransactionForm({ id }: TransactionFormProps) {
             type: transaction.type,
             categoryId: transaction.categoryId,
             accountId: transaction.accountId,
-            toAccountId: transaction.toAccountId ?? null,
+            toAccountId: transaction.toAccountId || '',
             payeeId: transaction.payeeId,
             payeeName: transaction.payeeName,
             paymentMethod: transaction.paymentMethod,
@@ -332,7 +332,7 @@ export default function TransactionForm({ id }: TransactionFormProps) {
             tags: transaction.tags,
             frequency: recurringFrequency,
             startDate: transaction.date,
-            endDate: recurringEndDate ? recurringEndDate.getTime() : null,
+            endDate: recurringEndDate ? recurringEndDate.getTime() : 0,
             nextDueDate: transaction.date,
             isActive: true,
             createdAt: Date.now(),

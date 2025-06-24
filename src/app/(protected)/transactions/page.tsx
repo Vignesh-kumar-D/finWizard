@@ -1,30 +1,18 @@
 // app/transactions/page.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import {
-  format,
-  startOfMonth,
-  endOfMonth,
-  getYear,
-  getMonth,
-  parseISO,
-} from 'date-fns';
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTransactions } from '@/lib/firebase/transaction-context';
-import { Transaction, TransactionTag } from '@/types/transaction';
-import { TransactionType } from '@/types/index';
+import { useAccounts } from '@/lib/firebase/account-context';
 import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-
 import {
   Select,
   SelectContent,
@@ -32,322 +20,216 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
+import { Plus, ChevronRight, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 
-import { cn } from '@/lib/utils';
-
-// Define schema for date filter
-
-type DateFilter = {
-  month: number;
-  year: number;
-};
+interface Filters {
+  type: string;
+  accountId: string;
+  category: string;
+  dateRange: string;
+}
 
 export default function TransactionsPage() {
-  const { transactions, loading, refreshTransactions, tags } =
-    useTransactions();
-
-  // Get current month and year for initial filter
-  const currentDate = useMemo(() => new Date(), []);
-  const [dateFilter, setDateFilter] = useState<DateFilter>({
-    month: getMonth(currentDate),
-    year: getYear(currentDate),
+  const { transactions, loading } = useTransactions();
+  const { accounts } = useAccounts();
+  const [filters, setFilters] = useState<Filters>({
+    type: '',
+    accountId: '',
+    category: '',
+    dateRange: '',
   });
 
-  // Generate list of years for filtering (5 years back to current year)
-  const availableYears = useMemo(() => {
-    const currentYear = getYear(currentDate);
-    return Array.from({ length: 6 }, (_, i) => currentYear - 5 + i);
-  }, [currentDate]);
+  // Get unique categories from transactions
+  const categories = useMemo(() => {
+    const cats = transactions
+      .map((t) => t.categoryId)
+      .filter((cat) => cat && cat.trim() !== '');
+    return [...new Set(cats)].sort();
+  }, [transactions]);
 
-  // Generate month options
-  const months = [
-    { value: 0, label: 'January' },
-    { value: 1, label: 'February' },
-    { value: 2, label: 'March' },
-    { value: 3, label: 'April' },
-    { value: 4, label: 'May' },
-    { value: 5, label: 'June' },
-    { value: 6, label: 'July' },
-    { value: 7, label: 'August' },
-    { value: 8, label: 'September' },
-    { value: 9, label: 'October' },
-    { value: 10, label: 'November' },
-    { value: 11, label: 'December' },
-  ];
-
-  // Filter transactions by month and year
+  // Filter transactions based on current filters
   const filteredTransactions = useMemo(() => {
-    if (!transactions.length) return [];
+    return transactions.filter((transaction) => {
+      if (filters.type && transaction.type !== filters.type) return false;
+      if (filters.accountId && transaction.accountId !== filters.accountId)
+        return false;
+      if (filters.category && transaction.categoryId !== filters.category)
+        return false;
 
-    const startDate = startOfMonth(new Date(dateFilter.year, dateFilter.month));
-    const endDate = endOfMonth(new Date(dateFilter.year, dateFilter.month));
-
-    return transactions
-      .filter((transaction) => {
+      if (filters.dateRange) {
         const transactionDate = new Date(transaction.date);
-        return transactionDate >= startDate && transactionDate <= endDate;
-      })
-      .sort((a, b) => b.date - a.date); // Sort by date, newest first
-  }, [transactions, dateFilter]);
+        const now = new Date();
 
-  // Group transactions by day
-  const transactionsByDay = useMemo(() => {
-    const grouped = new Map<string, Transaction[]>();
-
-    filteredTransactions.forEach((transaction) => {
-      const dateKey = format(new Date(transaction.date), 'yyyy-MM-dd');
-      if (!grouped.has(dateKey)) {
-        grouped.set(dateKey, []);
-      }
-      grouped.get(dateKey)!.push(transaction);
-    });
-
-    // Convert to array and sort by date (newest first)
-    return Array.from(grouped.entries()).sort(([dateA], [dateB]) => {
-      return parseISO(dateB).getTime() - parseISO(dateA).getTime();
-    });
-  }, [filteredTransactions]);
-
-  // Calculate daily totals
-  const getDailyTotal = (transactions: Transaction[]) => {
-    const totals = {
-      expense: 0,
-      income: 0,
-      transfer: 0,
-      investment: 0,
-      net: 0,
-    };
-
-    transactions.forEach((transaction) => {
-      const amount = transaction.amount;
-      switch (transaction.type) {
-        case 'expense':
-          totals.expense += amount;
-          totals.net -= amount;
-          break;
-        case 'income':
-          totals.income += amount;
-          totals.net += amount;
-          break;
-        case 'transfer':
-          totals.transfer += amount;
-          break;
-        case 'investment':
-          totals.investment += amount;
-          break;
-      }
-    });
-
-    return totals;
-  };
-
-  // Calculate monthly total
-  const monthlyTotal = useMemo(() => {
-    return getDailyTotal(filteredTransactions);
-  }, [filteredTransactions]);
-
-  // Load transactions when component mounts
-  useEffect(() => {
-    refreshTransactions();
-  }, [refreshTransactions]);
-
-  // Navigation to prev/next month
-  const goToPreviousMonth = () => {
-    setDateFilter((prev) => {
-      let newMonth = prev.month - 1;
-      let newYear = prev.year;
-
-      if (newMonth < 0) {
-        newMonth = 11;
-        newYear -= 1;
+        switch (filters.dateRange) {
+          case 'today':
+            return transactionDate.toDateString() === now.toDateString();
+          case 'week':
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return transactionDate >= weekAgo;
+          case 'month':
+            return (
+              transactionDate.getMonth() === now.getMonth() &&
+              transactionDate.getFullYear() === now.getFullYear()
+            );
+          case 'year':
+            return transactionDate.getFullYear() === now.getFullYear();
+          default:
+            return true;
+        }
       }
 
-      return { month: newMonth, year: newYear };
+      return true;
     });
-  };
+  }, [transactions, filters]);
 
-  const goToNextMonth = () => {
-    setDateFilter((prev) => {
-      let newMonth = prev.month + 1;
-      let newYear = prev.year;
+  // Format transaction date
+  const formatTransactionDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
 
-      if (newMonth > 11) {
-        newMonth = 0;
-        newYear += 1;
-      }
-
-      return { month: newMonth, year: newYear };
-    });
-  };
-
-  // Utility function to format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount);
-  };
-
-  // Get color class based on transaction type
-  const getTransactionColor = (type: TransactionType) => {
-    switch (type) {
-      case 'expense':
-        return 'text-red-600';
-      case 'income':
-        return 'text-green-600';
-      case 'transfer':
-        return 'text-blue-600';
-      case 'investment':
-        return 'text-purple-600';
-      default:
-        return '';
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
     }
   };
 
-  // Find tag details from ID
-  const getTagById = (tagId: string): TransactionTag | undefined => {
-    return tags.find((tag) => tag.id === tagId);
-  };
-
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Transactions</h1>
-        <Link href="/transactions/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" /> Add Transaction
-          </Button>
-        </Link>
+    <div className="space-y-4 px-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold">Transactions</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            View and manage your financial transactions
+          </p>
+        </div>
+        <Button asChild className="mt-4 sm:mt-0 w-full sm:w-auto">
+          <Link href="/transactions/new">
+            <Plus className="mr-2 h-4 w-4" />
+            New Transaction
+          </Link>
+        </Button>
       </div>
 
-      {/* Month and Year Navigation */}
-      <Card className="mb-6">
+      {/* Filters */}
+      <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-4 mb-4 md:mb-0">
-              <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-
-              <div className="flex items-center space-x-2">
-                <Select
-                  value={dateFilter.month.toString()}
-                  onValueChange={(value) =>
-                    setDateFilter((prev) => ({
-                      ...prev,
-                      month: parseInt(value),
-                    }))
-                  }
-                >
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {months.map((month) => (
-                      <SelectItem
-                        key={month.value}
-                        value={month.value.toString()}
-                      >
-                        {month.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={dateFilter.year.toString()}
-                  onValueChange={(value) =>
-                    setDateFilter((prev) => ({
-                      ...prev,
-                      year: parseInt(value),
-                    }))
-                  }
-                >
-                  <SelectTrigger className="w-[100px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableYears.map((year) => (
-                      <SelectItem key={year} value={year.toString()}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={goToNextMonth}
-                disabled={
-                  dateFilter.month === getMonth(currentDate) &&
-                  dateFilter.year === getYear(currentDate)
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="type">Type</Label>
+              <Select
+                value={filters.type}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, type: value })
                 }
               >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+                <SelectTrigger>
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="expense">Expense</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
-              <div className="text-center">
-                <div className="text-sm font-medium text-muted-foreground">
-                  Income
-                </div>
-                <div className="text-lg font-semibold text-green-600">
-                  {formatCurrency(monthlyTotal.income)}
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-sm font-medium text-muted-foreground">
-                  Expenses
-                </div>
-                <div className="text-lg font-semibold text-red-600">
-                  {formatCurrency(monthlyTotal.expense)}
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-sm font-medium text-muted-foreground">
-                  Transfers
-                </div>
-                <div className="text-lg font-semibold text-blue-600">
-                  {formatCurrency(monthlyTotal.transfer)}
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-sm font-medium text-muted-foreground">
-                  Net
-                </div>
-                <div
-                  className={cn(
-                    'text-lg font-semibold',
-                    monthlyTotal.net >= 0 ? 'text-green-600' : 'text-red-600'
-                  )}
-                >
-                  {formatCurrency(monthlyTotal.net)}
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="account">Account</Label>
+              <Select
+                value={filters.accountId}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, accountId: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All accounts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All accounts</SelectItem>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Select
+                value={filters.category}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, category: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dateRange">Date Range</Label>
+              <Select
+                value={filters.dateRange}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, dateRange: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All time" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This week</SelectItem>
+                  <SelectItem value="month">This month</SelectItem>
+                  <SelectItem value="year">This year</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Transactions List */}
       {loading ? (
-        <div className="grid gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-4 w-1/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-3 w-3/4" />
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="h-10 w-10 bg-muted rounded-full"></div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted rounded w-32"></div>
+                      <div className="h-3 bg-muted rounded w-24"></div>
+                    </div>
+                  </div>
+                  <div className="h-6 bg-muted rounded w-20"></div>
+                </div>
               </CardContent>
-              <CardFooter>
-                <Skeleton className="h-3 w-1/4" />
-              </CardFooter>
             </Card>
           ))}
         </div>
@@ -356,116 +238,87 @@ export default function TransactionsPage() {
           <CardHeader>
             <CardTitle>No Transactions Found</CardTitle>
             <CardDescription>
-              No transactions for {months[dateFilter.month].label}{' '}
-              {dateFilter.year}
+              {transactions.length === 0
+                ? "You don't have any transactions yet. Add your first transaction to get started!"
+                : 'No transactions match your current filters. Try adjusting your search criteria.'}
             </CardDescription>
           </CardHeader>
-          <CardFooter className="justify-center">
-            <Link href="/transactions/new">
-              <Button>Add Transaction</Button>
-            </Link>
-          </CardFooter>
+          <CardContent>
+            <Button asChild>
+              <Link href="/transactions/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Transaction
+              </Link>
+            </Button>
+          </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
-          {transactionsByDay.map(([dateKey, dayTransactions]) => {
-            const displayDate = format(new Date(dateKey), 'EEEE, MMMM d, yyyy');
-            const dailyTotal = getDailyTotal(dayTransactions);
-
-            return (
-              <div key={dateKey} className="space-y-2">
+        <div className="space-y-3">
+          {filteredTransactions.map((transaction) => (
+            <Card
+              key={transaction.id}
+              className="hover:shadow-md transition-shadow"
+            >
+              <CardContent className="p-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">{displayDate}</h3>
-                  <div
-                    className={cn(
-                      'font-medium',
-                      dailyTotal.net >= 0 ? 'text-green-600' : 'text-red-600'
-                    )}
-                  >
-                    Net: {formatCurrency(dailyTotal.net)}
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <div
+                      className={`flex items-center justify-center h-10 w-10 rounded-full ${
+                        transaction.type === 'income'
+                          ? 'bg-green-100 text-green-600'
+                          : 'bg-red-100 text-red-600'
+                      }`}
+                    >
+                      {transaction.type === 'income' ? (
+                        <ArrowUpRight className="h-5 w-5" />
+                      ) : (
+                        <ArrowDownRight className="h-5 w-5" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm sm:text-base truncate">
+                        {transaction.description}
+                      </h3>
+                      <div className="flex items-center space-x-2 text-xs sm:text-sm text-muted-foreground">
+                        <span>{transaction.categoryId}</span>
+                        <span>•</span>
+                        <span>{formatTransactionDate(transaction.date)}</span>
+                        {transaction.accountId && (
+                          <>
+                            <span>•</span>
+                            <span>
+                              {accounts.find(
+                                (a) => a.id === transaction.accountId
+                              )?.name || 'Unknown Account'}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <div className="text-right">
+                      <p
+                        className={`font-semibold text-sm sm:text-base ${
+                          transaction.type === 'income'
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                        }`}
+                      >
+                        {transaction.type === 'income' ? '+' : '-'}
+                        {formatCurrency(Math.abs(transaction.amount))}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/transactions/${transaction.id}`}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
                   </div>
                 </div>
-
-                <div className="grid gap-2">
-                  {dayTransactions.map((transaction) => (
-                    <Link
-                      href={`/transactions/${transaction.id}`}
-                      key={transaction.id}
-                    >
-                      <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                              <div className="font-medium">
-                                {transaction.payeeName || 'Unknown Payee'}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {transaction.description || 'No description'}
-                              </div>
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                {transaction.isRecurring && (
-                                  <Badge
-                                    variant="outline"
-                                    className="flex items-center gap-1"
-                                  >
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      width="12"
-                                      height="12"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
-                                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                                      <path d="M3 3v5h5" />
-                                    </svg>
-                                    Recurring
-                                  </Badge>
-                                )}
-                                {transaction.tags?.map((tagId) => {
-                                  const tag = getTagById(tagId);
-                                  return tag ? (
-                                    <Badge
-                                      key={tagId}
-                                      style={{
-                                        backgroundColor: tag.color,
-                                        color: 'white',
-                                      }}
-                                    >
-                                      {tag.name}
-                                    </Badge>
-                                  ) : null;
-                                })}
-                              </div>
-                            </div>
-                            <span
-                              className={cn(
-                                'text-lg font-semibold',
-                                getTransactionColor(transaction.type)
-                              )}
-                            >
-                              {transaction.type === 'expense'
-                                ? '-'
-                                : transaction.type === 'income'
-                                ? '+'
-                                : ''}
-                              {formatCurrency(transaction.amount).replace(
-                                '₹',
-                                ''
-                              )}
-                            </span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </div>

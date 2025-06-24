@@ -20,8 +20,15 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { Group, GroupMember, SharedExpense } from '@/types';
+import {
+  Group,
+  GroupMember,
+  SharedExpense,
+  Settlement,
+  UserProfile,
+} from '@/types';
 import { db } from './config';
+import { searchUsers } from './utils/user';
 
 interface GroupContextType {
   groups: Group[];
@@ -33,11 +40,31 @@ interface GroupContextType {
     groupId: string,
     expenseData: SharedExpense
   ) => Promise<void>;
+  addSettlementToGroup: (
+    groupId: string,
+    settlementData: Settlement
+  ) => Promise<void>;
   updateGroup: (groupId: string, groupData: Group) => Promise<void>;
   deleteExpense: (groupId: string, expenseId: string) => Promise<void>;
+  deleteSettlement: (groupId: string, settlementId: string) => Promise<void>;
   addMemberToGroup: (groupId: string, memberData: GroupMember) => Promise<void>;
   removeMemberFromGroup: (groupId: string, userId: string) => Promise<void>;
   leaveGroup: (groupId: string) => Promise<void>;
+  searchUsers: (searchTerm: string) => Promise<UserProfile[]>;
+  getUserBalance: (userId: string) => Promise<{
+    totalOwed: number;
+    totalPaid: number;
+    netBalance: number;
+    groupBalances: Record<
+      string,
+      {
+        groupName: string;
+        owed: number;
+        paid: number;
+        net: number;
+      }
+    >;
+  }>;
 }
 
 const GroupContext = createContext<GroupContextType | undefined>(undefined);
@@ -54,6 +81,7 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
   const { currentUser } = useFirebase();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
   const refreshGroups = useCallback(async () => {
     if (!currentUser || !db) return;
 
@@ -61,35 +89,25 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       // Query groups where the current user is a member
       const groupsCollection = collection(db, 'groups');
-      //   const memberQuery = query(
-      //     groupsCollection,
-      //     where('members', 'array-contains', { userId: currentUser.uid })
-      //   );
-
-      // This approach might not work with Firebase security rules
-      // Alternative: store memberIds separately for querying
       const querySnapshot = await getDocs(groupsCollection);
 
       const userGroups: Group[] = [];
 
-      querySnapshot.forEach(
-        (docSnapshot) => {
-          const groupData = {
-            id: docSnapshot.id,
-            ...(docSnapshot.data() as Omit<Group, 'id'>),
-          };
+      querySnapshot.forEach((docSnapshot) => {
+        const groupData = {
+          id: docSnapshot.id,
+          ...(docSnapshot.data() as Omit<Group, 'id'>),
+        };
 
-          // Check if current user is a member
-          const isMember = groupData.members.some(
-            (member: GroupMember) => member.userId === currentUser.uid
-          );
+        // Check if current user is a member
+        const isMember = groupData.members.some(
+          (member: GroupMember) => member.userId === currentUser.uid
+        );
 
-          if (isMember) {
-            userGroups.push(groupData);
-          }
-        },
-        [currentUser]
-      );
+        if (isMember) {
+          userGroups.push(groupData);
+        }
+      });
 
       setGroups(userGroups);
     } catch (error) {
@@ -99,6 +117,7 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     }
   }, [currentUser]);
+
   // Fetch groups when user changes
   useEffect(() => {
     if (currentUser) {
@@ -108,8 +127,6 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     }
   }, [currentUser, refreshGroups]);
-
-  // Refresh groups data
 
   // Get a single group by ID
   const getGroup = async (id: string) => {
@@ -160,7 +177,7 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
           name: currentUser.displayName || 'You',
           email: currentUser.email || '',
           role: 'admin',
-          joinedAt: 0,
+          joinedAt: Date.now(),
         });
       }
 
@@ -170,6 +187,8 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
         createdBy: currentUser.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        expenses: [],
+        settlements: [],
       });
 
       // Refresh the groups list
@@ -199,9 +218,31 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error('Group not found');
       }
 
-      // Add the expense to the group's expenses array
+      const groupData = groupDoc.data();
+
+      // Check if current user is a member
+      const isMember = groupData.members.some(
+        (member: GroupMember) => member.userId === currentUser.uid
+      );
+
+      if (!isMember) {
+        throw new Error('You must be a member of the group to add expenses');
+      }
+
+      // Generate a unique ID for the expense
+      const expenseWithId = {
+        ...expenseData,
+        id: `expense_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdBy: currentUser.uid,
+      };
+
+      // Get current expenses array and add the new expense
+      const currentExpenses = groupData.expenses || [];
+      const updatedExpenses = [...currentExpenses, expenseWithId];
+
+      // Update the group with the new expenses array
       await updateDoc(groupRef, {
-        expenses: arrayUnion(expenseData),
+        expenses: updatedExpenses,
         updatedAt: serverTimestamp(),
       });
 
@@ -209,6 +250,150 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
       await refreshGroups();
     } catch (error) {
       console.error('Error adding expense:', error);
+      throw error;
+    }
+  };
+
+  // Add a settlement to a group
+  const addSettlementToGroup = async (
+    groupId: string,
+    settlementData: Settlement
+  ) => {
+    if (!currentUser || !db) {
+      throw new Error('User must be logged in to add a settlement');
+    }
+
+    try {
+      const groupRef = doc(db, 'groups', groupId);
+      const groupDoc = await getDoc(groupRef);
+
+      if (!groupDoc.exists()) {
+        throw new Error('Group not found');
+      }
+
+      const groupData = groupDoc.data();
+
+      // Check if current user is a member
+      const isMember = groupData.members.some(
+        (member: GroupMember) => member.userId === currentUser.uid
+      );
+
+      if (!isMember) {
+        throw new Error('You must be a member of the group to add settlements');
+      }
+
+      // Generate a unique ID for the settlement
+      const settlementWithId = {
+        ...settlementData,
+        id: `settlement_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`,
+        createdBy: currentUser.uid,
+      };
+
+      // Get current settlements array and add the new settlement
+      const currentSettlements = groupData.settlements || [];
+      const updatedSettlements = [...currentSettlements, settlementWithId];
+
+      // Update the group with the new settlements array
+      await updateDoc(groupRef, {
+        settlements: updatedSettlements,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Refresh the groups list
+      await refreshGroups();
+    } catch (error) {
+      console.error('Error adding settlement:', error);
+      throw error;
+    }
+  };
+
+  // Search users for adding to groups
+  const searchUsersForGroup = async (searchTerm: string) => {
+    try {
+      const users = await searchUsers(searchTerm, 10);
+      return users.filter((user) => user.id !== currentUser?.uid); // Exclude current user
+    } catch (error) {
+      console.error('Error searching users:', error);
+      throw error;
+    }
+  };
+
+  // Calculate user balance across all groups
+  const getUserBalance = async (userId: string) => {
+    try {
+      const userGroups = groups.filter((group) =>
+        group.members.some((member) => member.userId === userId)
+      );
+
+      let totalOwed = 0;
+      let totalPaid = 0;
+      const groupBalances: Record<
+        string,
+        {
+          groupName: string;
+          owed: number;
+          paid: number;
+          net: number;
+        }
+      > = {};
+
+      userGroups.forEach((group) => {
+        let groupOwed = 0;
+        let groupPaid = 0;
+
+        // Calculate from expenses
+        group.expenses?.forEach((expense) => {
+          if (expense.paidBy === userId) {
+            // User paid for this expense
+            groupPaid += expense.amount;
+          }
+
+          // Calculate splits
+          expense.splits?.forEach((split) => {
+            if (split.userId === userId) {
+              if (split.userId === expense.paidBy) {
+                // If the person who paid is also in the splits, they already paid their share
+                // So they don't owe anything additional - their share is already covered
+                // We don't add to their owed amount since they already paid it
+              } else {
+                // For others, they owe their share
+                groupOwed += split.amount;
+              }
+            }
+          });
+        });
+
+        // Calculate from settlements
+        group.settlements?.forEach((settlement) => {
+          if (settlement.from === userId) {
+            groupPaid += settlement.amount;
+          } else if (settlement.to === userId) {
+            groupOwed += settlement.amount;
+          }
+        });
+
+        const groupNet = groupPaid - groupOwed;
+        groupBalances[group.id] = {
+          groupName: group.name,
+          owed: groupOwed,
+          paid: groupPaid,
+          net: groupNet,
+        };
+
+        totalOwed += groupOwed;
+        totalPaid += groupPaid;
+      });
+
+      return {
+        totalOwed,
+        totalPaid,
+        netBalance: totalPaid - totalOwed,
+        groupBalances,
+      };
+    } catch (error) {
+      console.error('Error calculating user balance:', error);
       throw error;
     }
   };
@@ -304,6 +489,62 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
       await refreshGroups();
     } catch (error) {
       console.error('Error deleting expense:', error);
+      throw error;
+    }
+  };
+
+  // Delete a settlement from a group
+  const deleteSettlement = async (groupId: string, settlementId: string) => {
+    if (!currentUser || !db) {
+      throw new Error('User must be logged in to delete a settlement');
+    }
+
+    try {
+      const groupRef = doc(db, 'groups', groupId);
+      const groupDoc = await getDoc(groupRef);
+
+      if (!groupDoc.exists()) {
+        throw new Error('Group not found');
+      }
+
+      const groupData = groupDoc.data();
+
+      // Check if the settlement exists and the current user is the creator or an admin
+      const settlement = groupData.settlements?.find(
+        (s: Settlement) => s.id === settlementId
+      );
+
+      if (!settlement) {
+        throw new Error('Settlement not found');
+      }
+
+      const isCreator = settlement.createdBy === currentUser.uid;
+      const isAdmin = groupData.members.some(
+        (member: GroupMember) =>
+          member.userId === currentUser.uid && member.role === 'admin'
+      );
+
+      if (!isCreator && !isAdmin) {
+        throw new Error(
+          'Only the settlement creator or group admins can delete settlements'
+        );
+      }
+
+      // Remove the settlement from the settlements array
+      const updatedSettlements = groupData.settlements.filter(
+        (s: Settlement) => s.id !== settlementId
+      );
+
+      // Update the group
+      await updateDoc(groupRef, {
+        settlements: updatedSettlements,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Refresh the groups list
+      await refreshGroups();
+    } catch (error) {
+      console.error('Error deleting settlement:', error);
       throw error;
     }
   };
@@ -438,11 +679,15 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
     getGroup,
     createGroup,
     addExpenseToGroup,
+    addSettlementToGroup,
     updateGroup,
     deleteExpense,
+    deleteSettlement,
     addMemberToGroup,
     removeMemberFromGroup,
     leaveGroup,
+    searchUsers: searchUsersForGroup,
+    getUserBalance,
   };
 
   return (

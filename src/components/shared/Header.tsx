@@ -71,7 +71,6 @@ const Header = () => {
             </div>
             <span className="font-bold text-xl">FinanceTrack</span>
           </Link>
-
           {/* Navigation */}
           <nav className="flex items-center space-x-1">
             <Link
@@ -114,7 +113,6 @@ const Header = () => {
               </Link>
             </Button>
           </nav>
-
           {/* User Menu */}
           <div className="flex items-center space-x-4">
             <Button variant="outline" size="icon" className="rounded-full">

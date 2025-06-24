@@ -191,6 +191,7 @@ export interface Group {
   createdAt: number; // Timestamp
   members: GroupMember[];
   expenses: SharedExpense[];
+  settlements: Settlement[];
 }
 
 export interface GroupMember {
@@ -204,6 +205,7 @@ export interface GroupMember {
 
 // Shared Expense
 export interface SharedExpense {
+  createdBy: string;
   id: string;
   groupId: string;
   date: number; // Timestamp

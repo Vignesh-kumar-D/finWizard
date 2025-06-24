@@ -1,93 +1,50 @@
 // app/groups/page.tsx
 'use client';
 
-import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, Users, ArrowRight } from 'lucide-react';
-import { useFirebase } from '@/lib/firebase/firebase-context';
+import { useGroups } from '@/lib/firebase/group-context';
 import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useGroups } from '@/lib/firebase/group-context';
-import { formatCurrency } from '@/lib/format';
-import { ExpenseSplit, SharedExpense } from '@/types';
+import { Plus, Users } from 'lucide-react';
 
 export default function GroupsPage() {
-  const { currentUser } = useFirebase();
-  const { groups, loading, refreshGroups } = useGroups();
-
-  useEffect(() => {
-    refreshGroups();
-  }, [refreshGroups]);
-
-  // Calculate balance for each group
-  const getGroupBalance = (groupId: string) => {
-    const group = groups.find((g) => g.id === groupId);
-    if (!group) return { youOwe: 0, othersOwe: 0, totalSpent: 0, yourSpent: 0 };
-
-    const userId = currentUser?.uid || '';
-    let youOwe = 0;
-    let othersOwe = 0;
-    let totalSpent = 0;
-    let yourSpent = 0;
-
-    // Process expenses
-    group.expenses.forEach((expense: SharedExpense) => {
-      totalSpent += expense.amount;
-
-      if (expense.paidBy === userId) {
-        yourSpent += expense.amount;
-
-        // Calculate how much others owe you for this expense
-        expense.splits.forEach((split: ExpenseSplit) => {
-          if (split.userId !== userId) {
-            othersOwe += split.amount;
-          }
-        });
-      } else {
-        // Find how much you owe for expenses paid by others
-        const yourSplit = expense.splits.find(
-          (split: ExpenseSplit) => split.userId === userId
-        );
-        if (yourSplit) {
-          youOwe += yourSplit.amount;
-        }
-      }
-    });
-
-    return { youOwe, othersOwe, totalSpent, yourSpent };
-  };
+  const { groups, loading } = useGroups();
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Groups</h1>
-        <Link href="/groups/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" /> Create Group
-          </Button>
-        </Link>
+    <div className="space-y-4 px-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold">Groups</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            Manage your group expenses and settlements
+          </p>
+        </div>
+        <Button asChild className="mt-4 sm:mt-0 w-full sm:w-auto">
+          <Link href="/groups/new">
+            <Plus className="mr-2 h-4 w-4" />
+            Create Group
+          </Link>
+        </Button>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="w-full">
-              <CardHeader>
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-4">
+                  <div className="h-12 w-12 bg-muted rounded-full"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-muted rounded w-3/4"></div>
+                    <div className="h-3 bg-muted rounded w-1/2"></div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -96,84 +53,49 @@ export default function GroupsPage() {
       ) : groups.length === 0 ? (
         <Card className="text-center p-8">
           <CardHeader>
-            <CardTitle>No Groups Found</CardTitle>
+            <CardTitle>No Groups Yet</CardTitle>
             <CardDescription>
-              You don&apos;t have any groups yet. Create a group to start
-              splitting expenses with friends!
+              Create your first group to start tracking shared expenses
             </CardDescription>
           </CardHeader>
-          <CardFooter className="justify-center">
-            <Link href="/groups/new">
-              <Button>Create Your First Group</Button>
-            </Link>
-          </CardFooter>
+          <CardContent>
+            <Button asChild>
+              <Link href="/groups/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Your First Group
+              </Link>
+            </Button>
+          </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {groups.map((group) => {
-            const { youOwe, othersOwe, totalSpent, yourSpent } =
-              getGroupBalance(group.id);
-            const netBalance = othersOwe - youOwe;
-
-            return (
-              <Link href={`/groups/${group.id}`} key={group.id}>
-                <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="flex items-center">
-                          <Users className="h-5 w-5 mr-2 text-muted-foreground" />
-                          {group.name}
-                        </CardTitle>
-                        <CardDescription>
-                          {group.members.length} members
-                        </CardDescription>
-                      </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+        <div className="space-y-3">
+          {groups.map((group) => (
+            <Card key={group.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary text-primary-foreground flex-shrink-0">
+                      <Users className="h-5 w-5" />
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Balance</p>
-                        <p
-                          className={`text-lg font-semibold ${
-                            netBalance > 0
-                              ? 'text-green-600'
-                              : netBalance < 0
-                              ? 'text-red-600'
-                              : ''
-                          }`}
-                        >
-                          {netBalance > 0
-                            ? `You get back ${formatCurrency(netBalance)}`
-                            : netBalance < 0
-                            ? `You owe ${formatCurrency(Math.abs(netBalance))}`
-                            : 'Settled up'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Group Total
-                        </p>
-                        <p className="text-lg font-semibold">
-                          {formatCurrency(totalSpent)}
-                        </p>
-                      </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm sm:text-base truncate">
+                        {group.name}
+                      </h3>
+                      <p className="text-muted-foreground text-xs sm:text-sm">
+                        {group.members.length} member
+                        {group.members.length !== 1 ? 's' : ''}
+                      </p>
                     </div>
-                  </CardContent>
-                  <CardFooter className="pt-2 border-t">
-                    <div className="w-full flex justify-between text-sm text-muted-foreground">
-                      <span>You paid: {formatCurrency(yourSpent)}</span>
-                      <span>
-                        Your share: {formatCurrency(yourSpent - netBalance)}
-                      </span>
-                    </div>
-                  </CardFooter>
-                </Card>
-              </Link>
-            );
-          })}
+                  </div>
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/groups/${group.id}`}>View</Link>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </div>

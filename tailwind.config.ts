@@ -107,8 +107,15 @@ module.exports = {
       },
       boxShadow: {
         'card-hover':
-          '0 10px 15px -3px rgba(var(--primary-rgb)/0.1), 0 4px 6px -4px rgba(var(--primary-rgb)/0.1)',
-        soft: '0 2px 10px rgba(0, 0, 0, 0.05)',
+          '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+        soft: '0 4px 20px rgba(0, 0, 0, 0.15)',
+        glossy:
+          '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+        'glossy-hover':
+          '0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+        'primary-glow': '0 0 20px rgba(59, 130, 246, 0.3)',
+        'income-glow': '0 0 20px rgba(34, 197, 94, 0.3)',
+        'expense-glow': '0 0 20px rgba(239, 68, 68, 0.3)',
       },
       typography: {
         DEFAULT: {

@@ -28,6 +28,7 @@ import {
   BellRing,
   Key,
   HelpCircle,
+  DollarSign,
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -142,6 +143,16 @@ export default function ProfilePage() {
                   <Link href="/profile">
                     <User className="mr-2 h-4 w-4" />
                     Personal Info
+                  </Link>
+                </Button>
+                <Button
+                  variant="ghost"
+                  asChild
+                  className="w-full justify-start"
+                >
+                  <Link href="/profile/balance">
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    My Balances
                   </Link>
                 </Button>
                 <Button
