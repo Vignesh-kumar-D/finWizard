@@ -19,7 +19,11 @@ const remotePatterns: RemotePattern[] = [
 const nextConfig: NextConfig = {
   /* config options here */
   images: {
-    domains: ['lh3.googleusercontent.com', 'localhost'],
+    domains: [
+      'lh3.googleusercontent.com',
+      'localhost',
+      'firebasestorage.googleapis.com',
+    ],
   },
   remotePatterns,
 };
