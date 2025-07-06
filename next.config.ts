@@ -1,19 +1,13 @@
 import type { NextConfig } from 'next';
 
-interface RemotePattern {
-  protocol: 'http' | 'https' | 'data';
-  hostname: string;
-  port?: string;
-  pathname?: string;
-}
-const remotePatterns: RemotePattern[] = [
+const remotePatterns = [
   {
-    protocol: 'https',
+    protocol: 'https' as const,
     hostname: 'lh3.googleusercontent.com',
   },
   {
-    protocol: 'data',
-    hostname: '**',
+    protocol: 'https' as const,
+    hostname: 'firebasestorage.googleapis.com',
   },
 ];
 const nextConfig: NextConfig = {
@@ -24,8 +18,8 @@ const nextConfig: NextConfig = {
       'localhost',
       'firebasestorage.googleapis.com',
     ],
+    remotePatterns,
   },
-  remotePatterns,
 };
 
 export default nextConfig;

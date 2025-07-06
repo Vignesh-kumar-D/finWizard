@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -27,15 +26,13 @@ import {
 import {
   ArrowLeft,
   Settings,
-  Users,
   Trash2,
-  UserPlus,
   UserMinus,
   Crown,
   AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Group, GroupMember } from '@/types';
+import { Group } from '@/types';
 
 export default function GroupSettingsPage() {
   const params = useParams();
@@ -47,11 +44,8 @@ export default function GroupSettingsPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [newMemberEmail, setNewMemberEmail] = useState('');
-
   // Form state
   const [groupName, setGroupName] = useState('');
-  const [description, setDescription] = useState('');
 
   const groupId = params.id as string;
 
@@ -66,7 +60,6 @@ export default function GroupSettingsPage() {
 
         if (groupData) {
           setGroupName(groupData.name);
-          setDescription(groupData.description || '');
         }
       } catch (error) {
         console.error('Error fetching group:', error);
@@ -101,7 +94,6 @@ export default function GroupSettingsPage() {
       const updatedGroup: Group = {
         ...group,
         name: groupName.trim(),
-        description: description.trim(),
       };
 
       await updateGroup(groupId, updatedGroup);
@@ -203,8 +195,8 @@ export default function GroupSettingsPage() {
           <CardHeader>
             <CardTitle>Group Not Found</CardTitle>
             <CardDescription>
-              The group you're looking for doesn't exist or you don't have
-              access to it.
+              The group you&apos;re looking for doesn&apos;t exist or you
+              don&apos;t have access to it.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -217,7 +209,6 @@ export default function GroupSettingsPage() {
     );
   }
 
-  const currentMember = getCurrentUserMember();
   const isAdmin = isCurrentUserAdmin();
 
   return (
@@ -260,17 +251,6 @@ export default function GroupSettingsPage() {
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 disabled={!isAdmin}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={!isAdmin}
-                rows={3}
               />
             </div>
 

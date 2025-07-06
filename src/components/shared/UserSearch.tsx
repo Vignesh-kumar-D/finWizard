@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useGroups } from '@/lib/firebase/group-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,20 +45,7 @@ export default function UserSearch({
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
 
-  // Debounced search
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchTerm.trim().length >= 2) {
-        performSearch();
-      } else {
-        setSearchResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
-
-  const performSearch = async () => {
+  const performSearch = useCallback(async () => {
     if (!searchTerm.trim() || searchTerm.trim().length < 2) {
       setSearchResults([]);
       return;
@@ -79,7 +66,19 @@ export default function UserSearch({
     } finally {
       setSearching(false);
     }
-  };
+  }, [searchTerm, searchUsers, excludeUsers]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim().length >= 2) {
+        performSearch();
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, performSearch]);
 
   const handleUserSelect = (user: UserProfile) => {
     setOpen(false);
@@ -230,19 +229,7 @@ export function UserSearchCombobox({
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchTerm.trim().length >= 2) {
-        performSearch();
-      } else {
-        setSearchResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
-
-  const performSearch = async () => {
+  const performSearch = useCallback(async () => {
     if (!searchTerm.trim() || searchTerm.trim().length < 2) {
       setSearchResults([]);
       return;
@@ -262,7 +249,19 @@ export function UserSearchCombobox({
     } finally {
       setSearching(false);
     }
-  };
+  }, [searchTerm, searchUsers, excludeUsers]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim().length >= 2) {
+        performSearch();
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, performSearch]);
 
   const handleUserSelect = (user: UserProfile) => {
     onUserSelect(user);
