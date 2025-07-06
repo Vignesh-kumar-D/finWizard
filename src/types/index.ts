@@ -153,7 +153,6 @@ export type InvestmentType =
   | 'crypto'
   | 'realEstate';
 
-// Investment
 export interface Investment {
   id: string;
   userId: string;
