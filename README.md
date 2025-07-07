@@ -1,4 +1,15 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Zeno - Personal Finance Manager
+
+A comprehensive personal finance management app with group expense tracking, built with Next.js, Firebase, and TypeScript.
+
+## Features
+
+- **Personal Finance Tracking**: Monitor your income, expenses, and savings
+- **Group Expense Management**: Split bills and track shared expenses with friends and family
+- **Budget Planning**: Set and track budgets across different categories
+- **Account Management**: Manage multiple bank accounts and payment methods
+- **Real-time Sync**: Cloud-based data synchronization across devices
+- **Dark Theme**: Beautiful glossy dark interface for better user experience
 
 ## Getting Started
 
@@ -19,6 +30,16 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **Styling**: Tailwind CSS with custom glossy theme
+- **Backend**: Firebase (Authentication, Firestore, Storage)
+- **UI Components**: Radix UI with custom components
+- **Forms**: React Hook Form with Zod validation
+- **State Management**: React Context API
+- **PWA**: Service Worker for offline functionality
 
 ## Learn More
 

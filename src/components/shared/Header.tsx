@@ -66,10 +66,16 @@ const Header = () => {
         <div className="container flex items-center justify-between h-16 px-4 mx-auto">
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center space-x-2">
-            <div className="flex items-center justify-center p-1.5 bg-primary rounded-md">
-              <Wallet className="w-5 h-5 text-primary-foreground" />
+            <div className="flex items-center justify-center p-1.5  rounded-md">
+              <Image
+                src="/images/icon_192x192.png"
+                alt="Zeno"
+                width={40}
+                height={40}
+                className="w-7 h-7 rounded"
+              />
             </div>
-            <span className="font-bold text-xl">FinanceTrack</span>
+            <span className="font-bold text-xl">Zeno</span>
           </Link>
           {/* Navigation */}
           <nav className="flex items-center space-x-1">

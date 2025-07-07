@@ -19,14 +19,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Personal Finance Manager',
+  title: 'Zeno',
   description:
     'A comprehensive personal finance management app with group expense tracking',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.png', sizes: '192x192', type: 'image/png' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    apple: [
+      { url: '/images/icon_192x192.png', sizes: '192x192', type: 'image/png' },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Personal Finance',
+    title: 'Zeno',
   },
   other: {
     'mobile-web-app-capable': 'yes',
@@ -55,10 +64,10 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               // Prevent flash of unstyled content
-              if (localStorage.getItem('finance-theme') === null) {
-                localStorage.setItem('finance-theme', 'dark');
+              if (localStorage.getItem('zeno-theme') === null) {
+                localStorage.setItem('zeno-theme', 'dark');
               }
-              const theme = localStorage.getItem('finance-theme') || 'dark';
+              const theme = localStorage.getItem('zeno-theme') || 'dark';
               document.documentElement.classList.add(theme);
               
               if ('serviceWorker' in navigator) {
