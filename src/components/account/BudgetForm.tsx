@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
+// import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -325,7 +325,14 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
                       type="number"
                       step="0.01"
                       placeholder="0.00"
-                      {...field}
+                      value={field.value === 0 ? '' : field.value}
+                      onChange={(e) => {
+                        const value =
+                          e.target.value === ''
+                            ? 0
+                            : parseFloat(e.target.value);
+                        field.onChange(value);
+                      }}
                     />
                   </FormControl>
                   <FormDescription>
@@ -347,7 +354,14 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
                       type="number"
                       step="0.01"
                       placeholder="0.00"
-                      {...field}
+                      value={field.value === 0 ? '' : field.value}
+                      onChange={(e) => {
+                        const value =
+                          e.target.value === ''
+                            ? 0
+                            : parseFloat(e.target.value);
+                        field.onChange(value);
+                      }}
                     />
                   </FormControl>
                   <FormDescription>
@@ -359,6 +373,7 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
             />
           </div>
 
+          {/* TODO: Implement rollover feature later
           <FormField
             control={form.control}
             name="rolloverEnabled"
@@ -379,6 +394,7 @@ export default function BudgetForm({ budgetId }: BudgetFormProps) {
               </FormItem>
             )}
           />
+          */}
 
           <div className="flex justify-end space-x-4">
             <Button

@@ -8,7 +8,7 @@ import { useAccounts } from '@/lib/firebase/account-context';
 import { useBudgets } from '@/lib/firebase/budget-context';
 import { TransactionType } from '@/types/index';
 import {
-  RecurrenceFrequency,
+  // RecurrenceFrequency, // TODO: Uncomment when implementing recurring transactions
   transactionFormSchema,
   TransactionFormValues,
   Transaction,
@@ -40,7 +40,7 @@ import {
   TransactionNote,
   TagSelection,
   ReceiptUpload,
-  RecurringOptions,
+  // RecurringOptions, // TODO: Uncomment when implementing recurring transactions
 } from '@/components/transaction';
 import { useFirebase } from '@/lib/firebase/firebase-context';
 
@@ -102,7 +102,7 @@ export default function TransactionForm({ id }: TransactionFormProps) {
     payees,
     tags,
     addTag,
-    createRecurring,
+    // createRecurring, // TODO: Uncomment when implementing recurring transactions
   } = useTransactions();
   const { currentUser } = useFirebase();
   const { accounts } = useAccounts();
@@ -128,11 +128,12 @@ export default function TransactionForm({ id }: TransactionFormProps) {
   const [removeExistingReceipt, setRemoveExistingReceipt] =
     useState<boolean>(false);
 
+  // TODO: Uncomment when implementing recurring transactions
   // State for handling recurring transaction
-  const [isRecurring, setIsRecurring] = useState<boolean>(false);
-  const [recurringFrequency, setRecurringFrequency] =
-    useState<RecurrenceFrequency>('monthly');
-  const [recurringEndDate, setRecurringEndDate] = useState<Date | null>(null);
+  // const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  // const [recurringFrequency, setRecurringFrequency] =
+  //   useState<RecurrenceFrequency>('monthly');
+  // const [recurringEndDate, setRecurringEndDate] = useState<Date | null>(null);
 
   // State for loading indicator
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -180,16 +181,17 @@ export default function TransactionForm({ id }: TransactionFormProps) {
             setSelectedPayee(data.payeeId || '');
             setNewPayeeName(data.payeeName || '');
             setSelectedTags(data.tags || []);
-            setIsRecurring(data.isRecurring);
+            // setIsRecurring(data.isRecurring); // TODO: Uncomment when implementing recurring transactions
             setExistingReceiptUrl(data.receiptImageUrl || null);
 
+            // TODO: Uncomment when implementing recurring transactions
             // If it's a recurring transaction, we would need to fetch the recurring details
-            if (data.isRecurring && data.recurringId) {
-              // You would need to implement a getRecurringTransaction function
-              // const recurringData = await getRecurringTransaction(data.recurringId);
-              // setRecurringFrequency(recurringData.frequency);
-              // setRecurringEndDate(recurringData.endDate ? new Date(recurringData.endDate) : null);
-            }
+            // if (data.isRecurring && data.recurringId) {
+            //   // You would need to implement a getRecurringTransaction function
+            //   // const recurringData = await getRecurringTransaction(data.recurringId);
+            //   // setRecurringFrequency(recurringData.frequency);
+            //   // setRecurringEndDate(recurringData.endDate ? new Date(recurringData.endDate) : null);
+            // }
           } else {
             toast.error('Transaction not found');
             router.push('/transactions');
@@ -308,40 +310,41 @@ export default function TransactionForm({ id }: TransactionFormProps) {
           description: data.description,
           tags: selectedTags.length > 0 ? selectedTags : [],
           isPlanned: false,
-          isRecurring: isRecurring,
+          isRecurring: false, // TODO: Change back to isRecurring when implementing recurring transactions
           recurringId: '',
           receiptImageUrl: '',
         };
 
+        // TODO: Uncomment when implementing recurring transactions
         // If it's a recurring transaction, create that first
-        if (isRecurring) {
-          const recurring = {
-            userId: currentUser?.uid ?? '',
-            title: `${transaction.payeeName || 'Transaction'} (${
-              transaction.amount
-            })`,
-            amount: transaction.amount,
-            type: transaction.type,
-            categoryId: transaction.categoryId,
-            accountId: transaction.accountId,
-            toAccountId: transaction.toAccountId || '',
-            payeeId: transaction.payeeId,
-            payeeName: transaction.payeeName,
-            paymentMethod: transaction.paymentMethod,
-            description: transaction.description,
-            tags: transaction.tags,
-            frequency: recurringFrequency,
-            startDate: transaction.date,
-            endDate: recurringEndDate ? recurringEndDate.getTime() : 0,
-            nextDueDate: transaction.date,
-            isActive: true,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          };
+        // if (isRecurring) {
+        //   const recurring = {
+        //     userId: currentUser?.uid ?? '',
+        //     title: `${transaction.payeeName || 'Transaction'} (${
+        //       transaction.amount
+        //     })`,
+        //     amount: transaction.amount,
+        //     type: transaction.type,
+        //     categoryId: transaction.categoryId,
+        //     accountId: transaction.accountId,
+        //     toAccountId: transaction.toAccountId || '',
+        //     payeeId: transaction.payeeId,
+        //     payeeName: transaction.payeeName,
+        //     paymentMethod: transaction.paymentMethod,
+        //     description: transaction.description,
+        //     tags: transaction.tags,
+        //     frequency: recurringFrequency,
+        //     startDate: transaction.date,
+        //     endDate: recurringEndDate ? recurringEndDate.getTime() : 0,
+        //     nextDueDate: transaction.date,
+        //     isActive: true,
+        //     createdAt: Date.now(),
+        //     updatedAt: Date.now(),
+        //   };
 
-          const createdRecurring = await createRecurring(recurring);
-          transaction.recurringId = createdRecurring.id;
-        }
+        //   const createdRecurring = await createRecurring(recurring);
+        //   transaction.recurringId = createdRecurring.id;
+        // }
 
         await addTransaction(transaction, receiptImage || undefined);
         toast.success('Transaction created');
@@ -532,7 +535,8 @@ export default function TransactionForm({ id }: TransactionFormProps) {
                 onRemove={handleReceiptRemoval}
               />
 
-              {/* Recurring Transaction Options - only show for new transactions */}
+              {/* TODO: Implement recurring transaction feature later
+              Recurring Transaction Options - only show for new transactions
               {!isEditMode && (
                 <RecurringOptions
                   isRecurring={isRecurring}
@@ -543,6 +547,7 @@ export default function TransactionForm({ id }: TransactionFormProps) {
                   setRecurringEndDate={setRecurringEndDate}
                 />
               )}
+              */}
 
               {/* Submit Buttons */}
               <div className="flex justify-end gap-4 pt-4">
@@ -585,8 +590,6 @@ export default function TransactionForm({ id }: TransactionFormProps) {
                     </>
                   ) : isEditMode ? (
                     'Update Transaction'
-                  ) : isRecurring ? (
-                    'Save & Create Recurring'
                   ) : (
                     'Save Transaction'
                   )}
