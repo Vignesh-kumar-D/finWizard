@@ -26,6 +26,7 @@ import {
 import { formatCurrency } from '@/lib/format';
 import { Group, SharedExpense } from '@/types';
 import { toast } from 'sonner';
+import Image from 'next/image';
 
 export default function GroupExpenseDetailPage() {
   const params = useParams();
@@ -329,7 +330,7 @@ export default function GroupExpenseDetailPage() {
                 <CardTitle>Receipt</CardTitle>
               </CardHeader>
               <CardContent>
-                <img
+                <Image
                   src={expense.receiptImageUrl}
                   alt="Receipt"
                   className="w-full rounded-lg"
