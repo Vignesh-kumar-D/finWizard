@@ -107,41 +107,41 @@ export default function CreateGroupExpensePage() {
     const totalAmount = parseFloat(amount);
     if (isNaN(totalAmount) || totalAmount <= 0) return;
 
-    const includedMembers = splitOptions.filter((option) => option.isIncluded);
-    if (includedMembers.length === 0) return;
+    setSplitOptions((prevOptions) => {
+      const includedMembers = prevOptions.filter((option) => option.isIncluded);
+      if (includedMembers.length === 0) return prevOptions;
 
-    const newSplitOptions = splitOptions.map((option) => {
-      if (!option.isIncluded) {
-        return { ...option, amount: 0, percentage: 0 };
-      }
+      return prevOptions.map((option) => {
+        if (!option.isIncluded) {
+          return { ...option, amount: 0, percentage: 0 };
+        }
 
-      let newAmount = 0;
-      let newPercentage = 0;
+        let newAmount = 0;
+        let newPercentage = 0;
 
-      switch (splitType) {
-        case 'equal':
-          newAmount = totalAmount / includedMembers.length;
-          newPercentage = (newAmount / totalAmount) * 100;
-          break;
-        case 'percentage':
-          // Keep existing percentage, recalculate amount
-          newAmount = (option.percentage / 100) * totalAmount;
-          break;
-        case 'custom':
-          // Keep existing amount, recalculate percentage
-          newPercentage = (option.amount / totalAmount) * 100;
-          break;
-      }
+        switch (splitType) {
+          case 'equal':
+            newAmount = totalAmount / includedMembers.length;
+            newPercentage = (newAmount / totalAmount) * 100;
+            break;
+          case 'percentage':
+            // Keep existing percentage, recalculate amount
+            newAmount = (option.percentage / 100) * totalAmount;
+            break;
+          case 'custom':
+            // Keep existing amount, recalculate percentage
+            newPercentage = (option.amount / totalAmount) * 100;
+            break;
+        }
 
-      return {
-        ...option,
-        amount: Math.round(newAmount * 100) / 100, // Round to 2 decimal places
-        percentage: Math.round(newPercentage * 100) / 100,
-      };
+        return {
+          ...option,
+          amount: Math.round(newAmount * 100) / 100, // Round to 2 decimal places
+          percentage: Math.round(newPercentage * 100) / 100,
+        };
+      });
     });
-
-    setSplitOptions(newSplitOptions);
-  }, [amount, splitType, group, splitOptions]);
+  }, [amount, splitType, group]);
 
   const handleSplitTypeChange = (type: SplitType) => {
     setSplitType(type);
