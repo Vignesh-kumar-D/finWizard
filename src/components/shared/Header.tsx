@@ -178,6 +178,72 @@ const Header = () => {
         </div>
       </header>
 
+      {/* Mobile Top Header */}
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b shadow-sm">
+        <div className="flex items-center justify-between h-14 px-4">
+          {/* Logo */}
+          <Link href="/dashboard" className="flex items-center space-x-2">
+            <div className="flex items-center justify-center p-1.5 rounded-md">
+              <Image
+                src="/images/icon_192x192.png"
+                alt="Zeno"
+                width={40}
+                height={40}
+                className="w-6 h-6 rounded"
+              />
+            </div>
+            <span className="font-bold text-lg">Zeno</span>
+          </Link>
+
+          {/* Profile Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+              >
+                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-secondary text-secondary-foreground">
+                  {userProfile?.photoURL ? (
+                    <Image
+                      src={userProfile.photoURL}
+                      alt={userProfile.name}
+                      width={28}
+                      height={28}
+                      priority
+                      className="w-7 h-7 rounded-full"
+                    />
+                  ) : (
+                    <span className="text-sm font-medium">
+                      {userProfile?.name?.charAt(0) || 'U'}
+                    </span>
+                  )}
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/profile"
+                  className="flex items-center w-full cursor-pointer"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  Profile
+                </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
+
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-sm">
         <div className="flex items-center justify-around h-16">
@@ -229,20 +295,14 @@ const Header = () => {
             <Group className="w-5 h-5" />
             <span className="text-xs mt-1">Groups</span>
           </Link>
-          <Link
-            href="/profile"
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              isActive('/profile') ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            <User className="w-5 h-5" />
-            <span className="text-xs mt-1">Profile</span>
-          </Link>
         </div>
       </nav>
 
       {/* Mobile spacing to prevent content from being hidden behind the bottom nav */}
       <div className="block md:hidden h-16"></div>
+
+      {/* Mobile top spacing to prevent content from being hidden behind the top header */}
+      <div className="block md:hidden h-14"></div>
 
       {/* Desktop spacing to prevent content from being hidden behind the top header */}
       <div className="hidden md:block h-16"></div>

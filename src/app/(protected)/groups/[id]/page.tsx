@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useFirebase } from '@/lib/firebase/firebase-context';
 import { useGroups } from '@/lib/firebase/group-context';
+import { serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -71,6 +72,8 @@ export default function GroupDetailPage() {
         totalOwed: number;
         netBalance: number;
         expenses: SharedExpense[];
+        owedByOthers: Record<string, number>; // How much each person owes to this member
+        owesToOthers: Record<string, number>; // How much this person owes to each member
       }
     > = {};
 
@@ -81,6 +84,8 @@ export default function GroupDetailPage() {
         totalOwed: 0,
         netBalance: 0,
         expenses: [],
+        owedByOthers: {},
+        owesToOthers: {},
       };
     });
 
@@ -99,12 +104,30 @@ export default function GroupDetailPage() {
       expense.splits.forEach((split) => {
         if (balances[split.userId]) {
           if (split.userId === paidBy) {
-            // If the person who paid is also in the splits, they already paid their share
-            // So they don't owe anything additional - their share is already covered
-            // We don't add to their owed amount since they already paid it
-          } else {
-            // For others, they owe their share
+            // If the person who paid is also in the splits, they owe their share to themselves
+            // This effectively reduces their net payment by their share amount
             balances[split.userId].totalOwed += split.amount;
+
+            // They owe this amount to themselves (which cancels out)
+            if (!balances[split.userId].owesToOthers[split.userId]) {
+              balances[split.userId].owesToOthers[split.userId] = 0;
+            }
+            balances[split.userId].owesToOthers[split.userId] += split.amount;
+          } else {
+            // For others, they owe their share to the person who paid
+            balances[split.userId].totalOwed += split.amount;
+
+            // Track who owes what to whom
+            if (!balances[split.userId].owesToOthers[paidBy]) {
+              balances[split.userId].owesToOthers[paidBy] = 0;
+            }
+            balances[split.userId].owesToOthers[paidBy] += split.amount;
+
+            // Track how much the payer is owed by this person
+            if (!balances[paidBy].owedByOthers[split.userId]) {
+              balances[paidBy].owedByOthers[split.userId] = 0;
+            }
+            balances[paidBy].owedByOthers[split.userId] += split.amount;
           }
         }
       });
@@ -127,8 +150,36 @@ export default function GroupDetailPage() {
   };
 
   // Format date
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString('en-US', {
+  const formatDate = (timestamp: number | { toDate: () => Date } | unknown) => {
+    if (!timestamp) {
+      return 'Unknown date';
+    }
+
+    let date: Date;
+
+    // Handle Firebase Timestamp objects
+    if (
+      timestamp &&
+      typeof timestamp === 'object' &&
+      'toDate' in timestamp &&
+      typeof timestamp.toDate === 'function'
+    ) {
+      date = timestamp.toDate();
+    } else if (typeof timestamp === 'number') {
+      // Handle regular number timestamps
+      if (isNaN(timestamp)) {
+        return 'Unknown date';
+      }
+      date = new Date(timestamp);
+    } else {
+      return 'Unknown date';
+    }
+
+    if (isNaN(date.getTime())) {
+      return 'Invalid date';
+    }
+
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -158,7 +209,7 @@ export default function GroupDetailPage() {
         email: user.email || '',
         photoURL: user.photoURL,
         role: 'member' as const,
-        joinedAt: Date.now(),
+        joinedAt: Date.now(), // Will be converted to serverTimestamp in the context
       };
 
       await addMemberToGroup(group.id, memberData);
@@ -213,43 +264,43 @@ export default function GroupDetailPage() {
   const balances = calculateMemberBalances();
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-4 px-4 sm:py-8 sm:px-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col space-y-4 mb-6 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+        <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
           <Link href="/groups">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" className="w-fit">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Groups
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold flex items-center">
-              <Users className="h-6 w-6 mr-2" />
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center">
+              <Users className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
               {group.name}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground">
               {group.members.length} members • Created{' '}
               {formatDate(group.createdAt)}
             </p>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-2 sm:space-y-0">
           {isCurrentUserAdmin() && (
-            <Button variant="outline" asChild>
+            <Button variant="outline" asChild className="w-full sm:w-auto">
               <Link href={`/groups/${groupId}/settings`}>
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </Link>
             </Button>
           )}
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link href={`/groups/${groupId}/expenses/new`}>
               <Plus className="h-4 w-4 mr-2" />
               Add Expense
             </Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="w-full sm:w-auto">
             <Link href={`/groups/${groupId}/settlements/new`}>
               <CreditCard className="h-4 w-4 mr-2" />
               Add Settlement
@@ -265,17 +316,29 @@ export default function GroupDetailPage() {
             <CardTitle>Your Balance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="text-center">
-                <p className="text-sm text-muted-foreground">Total Spent</p>
-                <p className="text-2xl font-bold text-blue-600">
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Total Spent
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-blue-600">
                   {formatCurrency(currentUserBalance.totalPaid)}
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-muted-foreground">Net Balance</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Total Owed
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-orange-600">
+                  {formatCurrency(currentUserBalance.totalOwed)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Net Balance
+                </p>
                 <p
-                  className={`text-2xl font-bold ${
+                  className={`text-lg sm:text-2xl font-bold ${
                     currentUserBalance.netBalance > 0
                       ? 'text-green-600'
                       : currentUserBalance.netBalance < 0
@@ -288,6 +351,72 @@ export default function GroupDetailPage() {
                 </p>
               </div>
             </div>
+
+            {/* Detailed Breakdown */}
+            {(Object.keys(currentUserBalance.owedByOthers).length > 0 ||
+              Object.keys(currentUserBalance.owesToOthers).length > 0) && (
+              <div className="mt-6 space-y-4">
+                <h4 className="font-medium text-sm">Detailed Breakdown</h4>
+
+                {/* Who owes you */}
+                {Object.keys(currentUserBalance.owedByOthers).length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      You are owed by:
+                    </p>
+                    <div className="space-y-2">
+                      {Object.entries(currentUserBalance.owedByOthers)
+                        .filter(
+                          ([userId, amount]) =>
+                            amount > 0 && userId !== currentUser?.uid
+                        )
+                        .map(([userId, amount]) => (
+                          <div
+                            key={userId}
+                            className="flex justify-between items-center text-sm"
+                          >
+                            <span className="text-green-600">
+                              {getMemberName(userId)} owes you
+                            </span>
+                            <span className="font-medium text-green-600">
+                              {formatCurrency(amount)}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Who you owe */}
+                {Object.keys(currentUserBalance.owesToOthers).length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      You owe to:
+                    </p>
+                    <div className="space-y-2">
+                      {Object.entries(currentUserBalance.owesToOthers)
+                        .filter(
+                          ([userId, amount]) =>
+                            amount > 0 && userId !== currentUser?.uid
+                        )
+                        .map(([userId, amount]) => (
+                          <div
+                            key={userId}
+                            className="flex justify-between items-center text-sm"
+                          >
+                            <span className="text-red-600">
+                              You owe {getMemberName(userId)}
+                            </span>
+                            <span className="font-medium text-red-600">
+                              {formatCurrency(amount)}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -326,34 +455,38 @@ export default function GroupDetailPage() {
                     .map((expense) => (
                       <div
                         key={expense.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        className="flex flex-col space-y-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer sm:flex-row sm:items-center sm:justify-between sm:space-y-0"
                         onClick={() =>
                           router.push(
                             `/groups/${groupId}/expenses/${expense.id}`
                           )
                         }
                       >
-                        <div className="flex items-center space-x-4">
-                          <div className="p-2 rounded-full bg-primary/10">
-                            <Receipt className="h-5 w-5 text-primary" />
+                        <div className="flex items-center space-x-3 sm:space-x-4">
+                          <div className="p-2 rounded-full bg-primary/10 flex-shrink-0">
+                            <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                           </div>
-                          <div>
-                            <p className="font-medium">{expense.description}</p>
-                            <div className="flex items-center text-sm text-muted-foreground">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              <span>{formatDate(expense.date)}</span>
-                              <span className="mx-1">•</span>
-                              <span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm sm:text-base truncate">
+                              {expense.description}
+                            </p>
+                            <div className="flex flex-col space-y-1 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2 text-xs sm:text-sm text-muted-foreground">
+                              <div className="flex items-center">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                <span>{formatDate(expense.date)}</span>
+                              </div>
+                              <span className="hidden sm:inline">•</span>
+                              <span className="truncate">
                                 Paid by {getMemberName(expense.paidBy)}
                               </span>
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold">
+                        <div className="flex items-center justify-between sm:flex-col sm:items-end sm:space-y-1">
+                          <p className="font-semibold text-sm sm:text-base">
                             {formatCurrency(expense.amount)}
                           </p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs sm:text-sm text-muted-foreground">
                             {expense.splits.length} splits
                           </p>
                         </div>
@@ -392,31 +525,35 @@ export default function GroupDetailPage() {
                     .map((settlement) => (
                       <div
                         key={settlement.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                        className="flex flex-col space-y-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors sm:flex-row sm:items-center sm:justify-between sm:space-y-0"
                       >
-                        <div className="flex items-center space-x-4">
-                          <div className="p-2 rounded-full bg-primary/10">
-                            <CreditCard className="h-5 w-5 text-primary" />
+                        <div className="flex items-center space-x-3 sm:space-x-4">
+                          <div className="p-2 rounded-full bg-primary/10 flex-shrink-0">
+                            <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                           </div>
-                          <div>
-                            <p className="font-medium">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm sm:text-base">
                               {getMemberName(settlement.from)} →{' '}
                               {getMemberName(settlement.to)}
                             </p>
-                            <div className="flex items-center text-sm text-muted-foreground">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              <span>{formatDate(settlement.date)}</span>
+                            <div className="flex flex-col space-y-1 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2 text-xs sm:text-sm text-muted-foreground">
+                              <div className="flex items-center">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                <span>{formatDate(settlement.date)}</span>
+                              </div>
                               {settlement.notes && (
                                 <>
-                                  <span className="mx-1">•</span>
-                                  <span>{settlement.notes}</span>
+                                  <span className="hidden sm:inline">•</span>
+                                  <span className="truncate">
+                                    {settlement.notes}
+                                  </span>
                                 </>
                               )}
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold">
+                        <div className="flex items-center justify-between sm:flex-col sm:items-end">
+                          <p className="font-semibold text-sm sm:text-base">
                             {formatCurrency(settlement.amount)}
                           </p>
                         </div>
@@ -451,28 +588,31 @@ export default function GroupDetailPage() {
                 {group.members.map((member) => (
                   <div
                     key={member.userId}
-                    className="flex items-center justify-between p-4 border rounded-lg"
+                    className="flex flex-col space-y-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between sm:space-y-0"
                   >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                        <User className="h-5 w-5 text-primary" />
+                    <div className="flex items-center space-x-3 sm:space-x-4">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <User className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                       </div>
-                      <div>
-                        <p className="font-medium">{member.name}</p>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm sm:text-base">
+                          {member.name}
+                        </p>
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
                           {member.email}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-2 sm:space-y-0">
                       <Badge
                         variant={
                           member.role === 'admin' ? 'default' : 'secondary'
                         }
+                        className="w-fit"
                       >
                         {member.role}
                       </Badge>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         Joined {formatDate(member.joinedAt)}
                       </p>
                     </div>
@@ -500,42 +640,54 @@ export default function GroupDetailPage() {
                   return (
                     <div
                       key={member.userId}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex flex-col space-y-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between sm:space-y-0"
                     >
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                          <User className="h-5 w-5 text-primary" />
+                      <div className="flex items-center space-x-3 sm:space-x-4">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                          <User className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                         </div>
-                        <div>
-                          <p className="font-medium">{member.name}</p>
-                          <p className="text-sm text-muted-foreground">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm sm:text-base">
+                            {member.name}
+                          </p>
+                          <p className="text-xs sm:text-sm text-muted-foreground truncate">
                             {member.email}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="grid grid-cols-2 gap-6 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Total Spent</p>
-                            <p className="font-medium text-blue-600">
-                              {formatCurrency(balance.totalPaid)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Net Balance</p>
-                            <p
-                              className={`font-medium ${
-                                balance.netBalance > 0
-                                  ? 'text-green-600'
-                                  : balance.netBalance < 0
-                                  ? 'text-red-600'
-                                  : 'text-foreground'
-                              }`}
-                            >
-                              {balance.netBalance > 0 ? '+' : ''}
-                              {formatCurrency(balance.netBalance)}
-                            </p>
-                          </div>
+                      <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
+                        <div className="text-center sm:text-right">
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            Total Spent
+                          </p>
+                          <p className="font-medium text-blue-600 text-sm sm:text-base">
+                            {formatCurrency(balance.totalPaid)}
+                          </p>
+                        </div>
+                        <div className="text-center sm:text-right">
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            Total Owed
+                          </p>
+                          <p className="font-medium text-orange-600 text-sm sm:text-base">
+                            {formatCurrency(balance.totalOwed)}
+                          </p>
+                        </div>
+                        <div className="text-center sm:text-right">
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            Net Balance
+                          </p>
+                          <p
+                            className={`font-medium text-sm sm:text-base ${
+                              balance.netBalance > 0
+                                ? 'text-green-600'
+                                : balance.netBalance < 0
+                                ? 'text-red-600'
+                                : 'text-foreground'
+                            }`}
+                          >
+                            {balance.netBalance > 0 ? '+' : ''}
+                            {formatCurrency(balance.netBalance)}
+                          </p>
                         </div>
                       </div>
                     </div>

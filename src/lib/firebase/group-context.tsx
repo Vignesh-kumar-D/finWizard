@@ -180,7 +180,7 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
           name: currentUser.displayName || 'You',
           email: currentUser.email || '',
           role: 'admin',
-          joinedAt: Date.now(),
+          joinedAt: serverTimestamp(),
         });
       }
 
@@ -587,9 +587,15 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error('This person is already a member of the group');
       }
 
+      // Create member data with regular timestamp for arrayUnion
+      const memberDataForArray = {
+        ...memberData,
+        joinedAt: Date.now(), // Use regular timestamp for arrayUnion
+      };
+
       // Add the member to the group
       await updateDoc(groupRef, {
-        members: arrayUnion(memberData),
+        members: arrayUnion(memberDataForArray),
         updatedAt: serverTimestamp(),
       });
 
