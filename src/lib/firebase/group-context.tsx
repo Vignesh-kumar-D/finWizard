@@ -129,35 +129,38 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentUser, refreshGroups]);
 
   // Get a single group by ID
-  const getGroup = async (id: string) => {
-    if (!db) return null;
+  const getGroup = useCallback(
+    async (id: string) => {
+      if (!db) return null;
 
-    try {
-      const groupDoc = await getDoc(doc(db, 'groups', id));
+      try {
+        const groupDoc = await getDoc(doc(db, 'groups', id));
 
-      if (groupDoc.exists()) {
-        const groupData = {
-          id: groupDoc.id,
-          ...(groupDoc.data() as Omit<Group, 'id'>),
-        };
+        if (groupDoc.exists()) {
+          const groupData = {
+            id: groupDoc.id,
+            ...(groupDoc.data() as Omit<Group, 'id'>),
+          };
 
-        // Check if current user is a member
-        if (
-          currentUser &&
-          groupData.members.some(
-            (member: GroupMember) => member.userId === currentUser.uid
-          )
-        ) {
-          return groupData;
+          // Check if current user is a member
+          if (
+            currentUser &&
+            groupData.members.some(
+              (member: GroupMember) => member.userId === currentUser.uid
+            )
+          ) {
+            return groupData;
+          }
         }
-      }
 
-      return null;
-    } catch (error) {
-      console.error('Error fetching group:', error);
-      throw error;
-    }
-  };
+        return null;
+      } catch (error) {
+        console.error('Error fetching group:', error);
+        throw error;
+      }
+    },
+    [currentUser]
+  );
 
   // Create a new group
   const createGroup = async (groupData: Group) => {

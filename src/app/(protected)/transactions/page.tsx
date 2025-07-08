@@ -138,7 +138,7 @@ export default function TransactionsPage() {
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="All types">All types</SelectItem>
                   <SelectItem value="income">Income</SelectItem>
                   <SelectItem value="expense">Expense</SelectItem>
                 </SelectContent>
@@ -157,7 +157,7 @@ export default function TransactionsPage() {
                   <SelectValue placeholder="All accounts" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All accounts</SelectItem>
+                  <SelectItem value="All accounts">All accounts</SelectItem>
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.name}
@@ -179,7 +179,7 @@ export default function TransactionsPage() {
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All categories</SelectItem>
+                  <SelectItem value="All categories">All categories</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category} value={category}>
                       {category}
@@ -201,7 +201,7 @@ export default function TransactionsPage() {
                   <SelectValue placeholder="All time" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All time</SelectItem>
+                  <SelectItem value="All time">All time</SelectItem>
                   <SelectItem value="today">Today</SelectItem>
                   <SelectItem value="week">This week</SelectItem>
                   <SelectItem value="month">This month</SelectItem>
