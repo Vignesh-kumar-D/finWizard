@@ -71,6 +71,8 @@ export default function GroupDetailPage() {
         totalOwed: number;
         netBalance: number;
         expenses: SharedExpense[];
+        owedByOthers: Record<string, number>; // How much each person owes to this member
+        owesToOthers: Record<string, number>; // How much this person owes to each member
       }
     > = {};
 
@@ -81,6 +83,8 @@ export default function GroupDetailPage() {
         totalOwed: 0,
         netBalance: 0,
         expenses: [],
+        owedByOthers: {},
+        owesToOthers: {},
       };
     });
 
@@ -99,12 +103,30 @@ export default function GroupDetailPage() {
       expense.splits.forEach((split) => {
         if (balances[split.userId]) {
           if (split.userId === paidBy) {
-            // If the person who paid is also in the splits, they already paid their share
-            // So they don't owe anything additional - their share is already covered
-            // We don't add to their owed amount since they already paid it
-          } else {
-            // For others, they owe their share
+            // If the person who paid is also in the splits, they owe their share to themselves
+            // This effectively reduces their net payment by their share amount
             balances[split.userId].totalOwed += split.amount;
+
+            // They owe this amount to themselves (which cancels out)
+            if (!balances[split.userId].owesToOthers[split.userId]) {
+              balances[split.userId].owesToOthers[split.userId] = 0;
+            }
+            balances[split.userId].owesToOthers[split.userId] += split.amount;
+          } else {
+            // For others, they owe their share to the person who paid
+            balances[split.userId].totalOwed += split.amount;
+
+            // Track who owes what to whom
+            if (!balances[split.userId].owesToOthers[paidBy]) {
+              balances[split.userId].owesToOthers[paidBy] = 0;
+            }
+            balances[split.userId].owesToOthers[paidBy] += split.amount;
+
+            // Track how much the payer is owed by this person
+            if (!balances[paidBy].owedByOthers[split.userId]) {
+              balances[paidBy].owedByOthers[split.userId] = 0;
+            }
+            balances[paidBy].owedByOthers[split.userId] += split.amount;
           }
         }
       });
@@ -265,13 +287,21 @@ export default function GroupDetailPage() {
             <CardTitle>Your Balance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="text-center">
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   Total Spent
                 </p>
                 <p className="text-lg sm:text-2xl font-bold text-blue-600">
                   {formatCurrency(currentUserBalance.totalPaid)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Total Owed
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-orange-600">
+                  {formatCurrency(currentUserBalance.totalOwed)}
                 </p>
               </div>
               <div className="text-center">
@@ -292,6 +322,72 @@ export default function GroupDetailPage() {
                 </p>
               </div>
             </div>
+
+            {/* Detailed Breakdown */}
+            {(Object.keys(currentUserBalance.owedByOthers).length > 0 ||
+              Object.keys(currentUserBalance.owesToOthers).length > 0) && (
+              <div className="mt-6 space-y-4">
+                <h4 className="font-medium text-sm">Detailed Breakdown</h4>
+
+                {/* Who owes you */}
+                {Object.keys(currentUserBalance.owedByOthers).length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      You are owed by:
+                    </p>
+                    <div className="space-y-2">
+                      {Object.entries(currentUserBalance.owedByOthers)
+                        .filter(
+                          ([userId, amount]) =>
+                            amount > 0 && userId !== currentUser?.uid
+                        )
+                        .map(([userId, amount]) => (
+                          <div
+                            key={userId}
+                            className="flex justify-between items-center text-sm"
+                          >
+                            <span className="text-green-600">
+                              {getMemberName(userId)} owes you
+                            </span>
+                            <span className="font-medium text-green-600">
+                              {formatCurrency(amount)}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Who you owe */}
+                {Object.keys(currentUserBalance.owesToOthers).length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      You owe to:
+                    </p>
+                    <div className="space-y-2">
+                      {Object.entries(currentUserBalance.owesToOthers)
+                        .filter(
+                          ([userId, amount]) =>
+                            amount > 0 && userId !== currentUser?.uid
+                        )
+                        .map(([userId, amount]) => (
+                          <div
+                            key={userId}
+                            className="flex justify-between items-center text-sm"
+                          >
+                            <span className="text-red-600">
+                              You owe {getMemberName(userId)}
+                            </span>
+                            <span className="font-medium text-red-600">
+                              {formatCurrency(amount)}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -530,13 +626,21 @@ export default function GroupDetailPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-6 sm:space-y-0">
+                      <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
                         <div className="text-center sm:text-right">
                           <p className="text-xs sm:text-sm text-muted-foreground">
                             Total Spent
                           </p>
                           <p className="font-medium text-blue-600 text-sm sm:text-base">
                             {formatCurrency(balance.totalPaid)}
+                          </p>
+                        </div>
+                        <div className="text-center sm:text-right">
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            Total Owed
+                          </p>
+                          <p className="font-medium text-orange-600 text-sm sm:text-base">
+                            {formatCurrency(balance.totalOwed)}
                           </p>
                         </div>
                         <div className="text-center sm:text-right">
