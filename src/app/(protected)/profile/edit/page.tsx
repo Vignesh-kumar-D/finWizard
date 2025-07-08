@@ -20,7 +20,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserProfile } from '@/types';
 import {
   User,
   Mail,
@@ -51,8 +50,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function ProfileEditPage() {
   const router = useRouter();
-  const { userProfile, updateProfile, isProfileComplete, currentUser } =
-    useFirebase();
+  const { userProfile, updateProfile, isProfileComplete } = useFirebase();
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
 
@@ -83,26 +81,8 @@ export default function ProfileEditPage() {
   const onSubmit = async (data: ProfileFormValues) => {
     setLoading(true);
     try {
-      // First, check if this is a new user or an existing one with an incomplete profile
-      const isNewUserProfile =
-        !userProfile?.id || Object.keys(userProfile).length === 0;
-
-      // Update or create the user profile in Firestore
-      await updateProfile({
-        ...data,
-        // Include any additional metadata needed for new users
-        ...(isNewUserProfile && {
-          createdAt: Date.now(),
-          authMethods:
-            currentUser?.providerData?.map((provider) => ({
-              authMethod: provider.providerId.includes('google')
-                ? 'google'
-                : 'phone',
-              uid: provider.uid,
-              linkedAt: Date.now(),
-            })) || [],
-        }),
-      } as Partial<UserProfile>);
+      // Update the user profile in Firestore
+      await updateProfile(data);
 
       toast.success('Profile updated successfully');
 
@@ -111,6 +91,11 @@ export default function ProfileEditPage() {
         setRedirecting(true);
         setTimeout(() => {
           router.push('/dashboard');
+        }, 1500);
+      } else {
+        // If not complete, redirect back to profile page
+        setTimeout(() => {
+          router.push('/profile');
         }, 1500);
       }
     } catch (error) {

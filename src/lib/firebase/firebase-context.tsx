@@ -66,7 +66,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
 
-      if (user && userProfile) {
+      if (user) {
         try {
           const profile = await getCurrentUserProfile(user.uid);
           setUserProfile(profile);
@@ -74,6 +74,8 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({
           setProfileCompleteStatus(profileComplete);
         } catch (error) {
           console.error('Error fetching user profile:', error);
+          setUserProfile(null);
+          setProfileCompleteStatus(false);
         }
       } else {
         setUserProfile(null);
@@ -84,7 +86,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     return () => unsubscribe();
-  }, [userProfile]);
+  }, []);
 
   const loginWithGoogle = async () => {
     const result = await signInWithGoogle();
@@ -147,29 +149,27 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({
         const mergedProfile = { ...newProfile, ...data };
 
         // Create user profile in Firestore
-        await createUserProfile(uid, mergedProfile);
+        const createdProfile = await createUserProfile(uid, mergedProfile);
 
         // Update local state
-        const fullProfile = { id: uid, ...mergedProfile };
-        setUserProfile(fullProfile);
-        setProfileCompleteStatus(isProfileComplete(fullProfile));
+        setUserProfile(createdProfile);
+        setProfileCompleteStatus(isProfileComplete(createdProfile));
       } else {
         // Update existing profile
         await updateUserProfile(uid, data);
 
-        // Update local state
-        setUserProfile({
+        // Create updated profile object
+        const updatedProfile = {
           ...userProfile,
           ...data,
-        });
+          lastActive: Date.now(),
+        };
+
+        // Update local state
+        setUserProfile(updatedProfile);
 
         // Re-evaluate if profile is complete
-        setProfileCompleteStatus(
-          isProfileComplete({
-            ...userProfile,
-            ...data,
-          })
-        );
+        setProfileCompleteStatus(isProfileComplete(updatedProfile));
       }
     } catch (error) {
       console.error('Error updating profile:', error);
