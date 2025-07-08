@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useFirebase } from '@/lib/firebase/firebase-context';
 import { useGroups } from '@/lib/firebase/group-context';
+import { serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -149,8 +150,36 @@ export default function GroupDetailPage() {
   };
 
   // Format date
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString('en-US', {
+  const formatDate = (timestamp: number | { toDate: () => Date } | unknown) => {
+    if (!timestamp) {
+      return 'Unknown date';
+    }
+
+    let date: Date;
+
+    // Handle Firebase Timestamp objects
+    if (
+      timestamp &&
+      typeof timestamp === 'object' &&
+      'toDate' in timestamp &&
+      typeof timestamp.toDate === 'function'
+    ) {
+      date = timestamp.toDate();
+    } else if (typeof timestamp === 'number') {
+      // Handle regular number timestamps
+      if (isNaN(timestamp)) {
+        return 'Unknown date';
+      }
+      date = new Date(timestamp);
+    } else {
+      return 'Unknown date';
+    }
+
+    if (isNaN(date.getTime())) {
+      return 'Invalid date';
+    }
+
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -180,7 +209,7 @@ export default function GroupDetailPage() {
         email: user.email || '',
         photoURL: user.photoURL,
         role: 'member' as const,
-        joinedAt: Date.now(),
+        joinedAt: Date.now(), // Will be converted to serverTimestamp in the context
       };
 
       await addMemberToGroup(group.id, memberData);

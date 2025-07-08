@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/lib/firebase/firebase-context';
 import { useGroups } from '@/lib/firebase/group-context';
+import { serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -46,7 +47,7 @@ export default function CreateGroupPage() {
       email: user.email || '',
       photoURL: user.photoURL,
       role: 'member',
-      joinedAt: Date.now(),
+      joinedAt: serverTimestamp(),
     };
 
     setMembers([...members, newMember]);
@@ -70,7 +71,7 @@ export default function CreateGroupPage() {
       const groupData: Omit<Group, 'id'> = {
         name: groupName.trim(),
         createdBy: currentUser?.uid || '',
-        createdAt: Date.now(),
+        createdAt: serverTimestamp(),
         members: [
           // Add current user as admin
           {
@@ -78,7 +79,7 @@ export default function CreateGroupPage() {
             name: currentUser?.displayName || 'You',
             email: currentUser?.email || '',
             role: 'admin',
-            joinedAt: Date.now(),
+            joinedAt: serverTimestamp(),
           },
           ...members,
         ],

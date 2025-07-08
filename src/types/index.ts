@@ -1,6 +1,7 @@
 // types/index.ts
 
 import { ICON_NAMES } from '@/lib/constants';
+import { FieldValue } from 'firebase/firestore';
 
 // User profile
 export interface AuthMethod {
@@ -187,7 +188,7 @@ export interface Group {
   id: string;
   name: string;
   createdBy: string; // userId
-  createdAt: number; // Timestamp
+  createdAt: number | { toDate: () => Date } | FieldValue; // Timestamp, Firebase Timestamp, or FieldValue
   members: GroupMember[];
   expenses: SharedExpense[];
   settlements: Settlement[];
@@ -199,7 +200,7 @@ export interface GroupMember {
   email: string;
   photoURL?: string;
   role: 'admin' | 'member';
-  joinedAt: number; // Timestamp
+  joinedAt: number | { toDate: () => Date } | FieldValue; // Timestamp, Firebase Timestamp, or FieldValue
 }
 
 // Shared Expense
@@ -214,7 +215,7 @@ export interface SharedExpense {
   category?: string;
   receiptImageUrl?: string;
   splits: ExpenseSplit[];
-  createdAt: number; // Timestamp
+  createdAt: number | { toDate: () => Date } | FieldValue; // Timestamp, Firebase Timestamp, or FieldValue
 }
 
 export interface ExpenseSplit {

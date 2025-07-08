@@ -32,14 +32,20 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Group } from '@/types';
+import { Group, UserProfile } from '@/types';
+import UserSearch from '@/components/shared/UserSearch';
 
 export default function GroupSettingsPage() {
   const params = useParams();
   const router = useRouter();
   const { currentUser } = useFirebase();
-  const { getGroup, updateGroup, removeMemberFromGroup, leaveGroup } =
-    useGroups();
+  const {
+    getGroup,
+    updateGroup,
+    removeMemberFromGroup,
+    leaveGroup,
+    addMemberToGroup,
+  } = useGroups();
 
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,6 +89,43 @@ export default function GroupSettingsPage() {
   const getCurrentUserMember = () => {
     if (!currentUser || !group) return null;
     return group.members.find((m) => m.userId === currentUser.uid);
+  };
+
+  // Format date helper function
+  const formatDate = (timestamp: number | { toDate: () => Date } | unknown) => {
+    if (!timestamp) {
+      return 'Unknown date';
+    }
+
+    let date: Date;
+
+    // Handle Firebase Timestamp objects
+    if (
+      timestamp &&
+      typeof timestamp === 'object' &&
+      'toDate' in timestamp &&
+      typeof timestamp.toDate === 'function'
+    ) {
+      date = timestamp.toDate();
+    } else if (typeof timestamp === 'number') {
+      // Handle regular number timestamps
+      if (isNaN(timestamp)) {
+        return 'Unknown date';
+      }
+      date = new Date(timestamp);
+    } else {
+      return 'Unknown date';
+    }
+
+    if (isNaN(date.getTime())) {
+      return 'Invalid date';
+    }
+
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   // Handle save group details
@@ -177,6 +220,32 @@ export default function GroupSettingsPage() {
     }
   };
 
+  // Handle add member
+  const handleAddMember = async (user: UserProfile) => {
+    if (!group || !isCurrentUserAdmin()) return;
+
+    try {
+      const memberData = {
+        userId: user.id,
+        name: user.name || user.email?.split('@')[0] || 'Unknown',
+        email: user.email || '',
+        photoURL: user.photoURL,
+        role: 'member' as const,
+        joinedAt: Date.now(), // Will be converted to serverTimestamp in the context
+      };
+
+      await addMemberToGroup(groupId, memberData);
+      toast.success(`${memberData.name} added to group`);
+
+      // Refresh group data
+      const updatedGroup = await getGroup(groupId);
+      setGroup(updatedGroup);
+    } catch (error) {
+      console.error('Error adding member:', error);
+      toast.error('Failed to add member');
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto py-8">
@@ -214,20 +283,20 @@ export default function GroupSettingsPage() {
   return (
     <div className="container mx-auto py-8 max-w-4xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col space-y-4 mb-6 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+        <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
           <Link href={`/groups/${groupId}`}>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" className="w-fit">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Group
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold flex items-center">
-              <Settings className="h-6 w-6 mr-2" />
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center">
+              <Settings className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
               Group Settings
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground">
               Manage your group settings and members
             </p>
           </div>
@@ -250,14 +319,13 @@ export default function GroupSettingsPage() {
                 id="groupName"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                disabled={!isAdmin}
               />
             </div>
 
             <div className="space-y-2">
               <Label>Created</Label>
               <p className="text-sm text-muted-foreground">
-                {new Date(group.createdAt).toLocaleDateString()}
+                {formatDate(group.createdAt)}
               </p>
             </div>
 
@@ -268,28 +336,49 @@ export default function GroupSettingsPage() {
               </p>
             </div>
 
-            {isAdmin && (
-              <Button onClick={handleSaveGroup} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            )}
+            <Button onClick={handleSaveGroup} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
           </CardContent>
         </Card>
 
         {/* Members Management */}
         <Card>
           <CardHeader>
-            <CardTitle>Members</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              Members
+              <Badge variant="secondary" className="ml-2">
+                {group.members.length}{' '}
+                {group.members.length === 1 ? 'member' : 'members'}
+              </Badge>
+            </CardTitle>
             <CardDescription>
               Manage group members and their roles
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Add Members Section - Only for Admins */}
+
+            <div className="mb-6 p-4 border rounded-lg bg-muted/50">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-sm font-medium">Add New Members</Label>
+                <UserSearch
+                  onUserSelect={handleAddMember}
+                  excludeUsers={group.members.map((m) => m.userId)}
+                  buttonText="Add Member"
+                  placeholder="Search users by name, email, or phone..."
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Search for users to add them to this group. They will be added
+                as regular members.
+              </p>
+            </div>
             <div className="space-y-4">
               {group.members.map((member) => (
                 <div
                   key={member.userId}
-                  className="flex items-center justify-between p-3 border rounded-lg"
+                  className="flex flex-col space-y-3 p-3 border rounded-lg"
                 >
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
@@ -310,10 +399,13 @@ export default function GroupSettingsPage() {
                       <p className="text-sm text-muted-foreground">
                         {member.email}
                       </p>
+                      <p className="text-xs text-muted-foreground">
+                        Joined {formatDate(member.joinedAt)}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-2 sm:space-y-0">
                     {isAdmin && member.userId !== currentUser?.uid && (
                       <Select
                         value={member.role}
@@ -321,7 +413,7 @@ export default function GroupSettingsPage() {
                           handleChangeRole(member.userId, value)
                         }
                       >
-                        <SelectTrigger className="w-24">
+                        <SelectTrigger className="w-full sm:w-48">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -338,13 +430,17 @@ export default function GroupSettingsPage() {
                         onClick={() =>
                           handleRemoveMember(member.userId, member.name)
                         }
+                        className="w-full sm:w-auto"
                       >
-                        <UserMinus className="h-4 w-4" />
+                        <UserMinus className="h-4 w-4 mr-2" />
+                        <span>Remove Member</span>
                       </Button>
                     )}
 
                     {!isAdmin && member.userId === currentUser?.uid && (
-                      <Badge variant="secondary">{member.role}</Badge>
+                      <Badge variant="secondary" className="w-fit">
+                        {member.role}
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -390,11 +486,7 @@ export default function GroupSettingsPage() {
                   This will permanently delete the group and all its data
                 </p>
               </div>
-              <Button
-                variant="destructive"
-                disabled
-                className="opacity-50 cursor-not-allowed"
-              >
+              <Button variant="destructive">
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete Group
               </Button>

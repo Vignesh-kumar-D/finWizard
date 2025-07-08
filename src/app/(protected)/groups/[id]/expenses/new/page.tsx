@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useFirebase } from '@/lib/firebase/firebase-context';
 import { useGroups } from '@/lib/firebase/group-context';
+import { serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -285,7 +286,7 @@ export default function CreateGroupExpensePage() {
         paidBy,
         category: category.trim() || '',
         splits,
-        createdAt: Date.now(),
+        createdAt: serverTimestamp(),
         createdBy: currentUser.uid,
       };
 
