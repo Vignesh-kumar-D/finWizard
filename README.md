@@ -94,7 +94,7 @@ A comprehensive personal finance management application built with Next.js, Fire
 1. **Clone the repository**
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Vignesh-kumar-D/finWizard.git
    cd vicky-personal-finance
    ```
 
