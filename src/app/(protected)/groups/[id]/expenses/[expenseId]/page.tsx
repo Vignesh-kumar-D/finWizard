@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useFirebase } from '@/lib/firebase/firebase-context';
-import { useGroups } from '@/lib/firebase/group-context';
+import { useGroups } from '@/lib/firebase/group-context-scalable';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -32,7 +32,7 @@ export default function GroupExpenseDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { currentUser } = useFirebase();
-  const { getGroup, deleteExpense } = useGroups();
+  const { getGroup, deleteExpense, getExpenseById } = useGroups();
 
   const [group, setGroup] = useState<Group | null>(null);
   const [expense, setExpense] = useState<SharedExpense | null>(null);
@@ -48,18 +48,17 @@ export default function GroupExpenseDetailPage() {
 
       setLoading(true);
       try {
-        const groupData = await getGroup(groupId);
+        // Fetch group data and expense in parallel
+        const [groupData, expenseData] = await Promise.all([
+          getGroup(groupId),
+          getExpenseById(groupId, expenseId),
+        ]);
+
         setGroup(groupData);
+        setExpense(expenseData);
 
-        if (groupData) {
-          const foundExpense = groupData.expenses.find(
-            (e) => e.id === expenseId
-          );
-          setExpense(foundExpense || null);
-
-          if (!foundExpense) {
-            toast.error('Expense not found');
-          }
+        if (!expenseData) {
+          toast.error('Expense not found');
         }
       } catch (error) {
         console.error('Error fetching group/expense:', error);
@@ -70,7 +69,7 @@ export default function GroupExpenseDetailPage() {
     };
 
     fetchGroupAndExpense();
-  }, [groupId, expenseId, getGroup]);
+  }, [groupId, expenseId, getGroup, getExpenseById]);
 
   const handleDeleteExpense = async () => {
     if (!expense || !group) return;
@@ -257,7 +256,7 @@ export default function GroupExpenseDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {expense.splits.map((split) => (
+                {expense.splits?.map((split) => (
                   <div
                     key={split.userId}
                     className="flex items-center justify-between p-3 border rounded-lg"
@@ -307,18 +306,20 @@ export default function GroupExpenseDetailPage() {
               </div>
               <div className="flex justify-between">
                 <span>Number of Splits</span>
-                <span className="font-semibold">{expense.splits.length}</span>
+                <span className="font-semibold">
+                  {expense.splits?.length || 0}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Paid Splits</span>
                 <span className="font-semibold text-green-600">
-                  {expense.splits.filter((s) => s.isPaid).length}
+                  {expense.splits?.filter((s) => s.isPaid).length || 0}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Unpaid Splits</span>
                 <span className="font-semibold text-red-600">
-                  {expense.splits.filter((s) => !s.isPaid).length}
+                  {expense.splits?.filter((s) => !s.isPaid).length || 0}
                 </span>
               </div>
             </CardContent>

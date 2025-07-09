@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useGroups } from '@/lib/firebase/group-context';
+import { useGroups } from '@/lib/firebase/group-context-scalable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,7 +56,7 @@ export default function UserSearch({
       const results = await searchUsers(searchTerm);
       // Filter out excluded users
       const filteredResults = results.filter(
-        (user) => !excludeUsers.includes(user.id)
+        (user: UserProfile) => !excludeUsers.includes(user.id)
       );
       setSearchResults(filteredResults);
     } catch (error) {
@@ -239,7 +239,7 @@ export function UserSearchCombobox({
     try {
       const results = await searchUsers(searchTerm);
       const filteredResults = results.filter(
-        (user) => !excludeUsers.includes(user.id)
+        (user: UserProfile) => !excludeUsers.includes(user.id)
       );
       setSearchResults(filteredResults);
     } catch (error) {

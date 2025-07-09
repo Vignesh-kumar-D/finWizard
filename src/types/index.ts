@@ -189,9 +189,10 @@ export interface Group {
   name: string;
   createdBy: string; // userId
   createdAt: number | { toDate: () => Date } | FieldValue; // Timestamp, Firebase Timestamp, or FieldValue
+  updatedAt?: number | { toDate: () => Date } | FieldValue; // Timestamp, Firebase Timestamp, or FieldValue
   members: GroupMember[];
-  expenses: SharedExpense[];
-  settlements: Settlement[];
+  // Note: expenses and settlements are now stored in separate collections
+  // and accessed via the scalable context
 }
 
 export interface GroupMember {

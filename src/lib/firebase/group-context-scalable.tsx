@@ -61,6 +61,10 @@ interface GroupContextType {
     lastDoc: QueryDocumentSnapshot | null;
     hasMore: boolean;
   }>;
+  getExpenseById: (
+    groupId: string,
+    expenseId: string
+  ) => Promise<SharedExpense | null>;
   addExpenseToGroup: (
     groupId: string,
     expenseData: Omit<SharedExpense, 'id'>
@@ -168,12 +172,12 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const groupsRef = collection(db, 'groups');
 
-      // Use array-contains query for efficient filtering
+      // Get all groups and filter client-side since Firestore doesn't support
+      // array-contains with partial object matches
       const q = query(
         groupsRef,
-        where('members', 'array-contains', { userId: currentUser.uid }),
         orderBy('createdAt', 'desc'),
-        limit(50) // Limit to prevent loading too many groups
+        limit(100) // Limit to prevent loading too many groups
       );
 
       const querySnapshot = await getDocs(q);
@@ -184,7 +188,16 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
           id: docSnapshot.id,
           ...(docSnapshot.data() as Omit<Group, 'id'>),
         };
-        userGroups.push(groupData);
+
+        // Check if current user is a member of this group
+        if (
+          groupData.members &&
+          groupData.members.some(
+            (member: GroupMember) => member.userId === currentUser.uid
+          )
+        ) {
+          userGroups.push(groupData);
+        }
       });
 
       setGroups(userGroups);
@@ -344,6 +357,35 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Get expense by ID
+  const getExpenseById = async (groupId: string, expenseId: string) => {
+    if (!db) {
+      return null;
+    }
+
+    try {
+      const expenseRef = doc(db, 'groupExpenses', expenseId);
+      const expenseDoc = await getDoc(expenseRef);
+
+      if (expenseDoc.exists()) {
+        const expenseData = expenseDoc.data();
+
+        // Verify the expense belongs to the specified group
+        if (expenseData.groupId === groupId) {
+          return {
+            id: expenseDoc.id,
+            ...expenseData,
+          } as SharedExpense;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error fetching expense by ID:', error);
+      throw error;
+    }
+  };
+
   // Add expense to group
   const addExpenseToGroup = async (
     groupId: string,
@@ -371,7 +413,13 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
       // Create expense in separate collection
       const expensesRef = collection(db, 'groupExpenses');
       const expenseWithId = {
-        ...expenseData,
+        description: expenseData.description,
+        amount: expenseData.amount,
+        date: expenseData.date || Date.now(),
+        paidBy: expenseData.paidBy,
+        splits: expenseData.splits || [],
+        category: expenseData.category || '',
+        receiptImageUrl: expenseData.receiptImageUrl || '',
         groupId,
         createdBy: currentUser.uid,
         createdAt: Date.now(),
@@ -404,8 +452,14 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       const expenseRef = doc(db, 'groupExpenses', expenseId);
+
+      // Filter out undefined values
+      const cleanExpenseData = Object.fromEntries(
+        Object.entries(expenseData).filter(([, value]) => value !== undefined)
+      );
+
       await updateDoc(expenseRef, {
-        ...expenseData,
+        ...cleanExpenseData,
         updatedAt: Date.now(),
       });
 
@@ -520,7 +574,11 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
       // Create settlement in separate collection
       const settlementsRef = collection(db, 'groupSettlements');
       const settlementWithId = {
-        ...settlementData,
+        from: settlementData.from,
+        to: settlementData.to,
+        amount: settlementData.amount,
+        date: settlementData.date || Date.now(),
+        notes: settlementData.notes || '',
         groupId,
         createdBy: currentUser.uid,
         createdAt: Date.now(),
@@ -553,8 +611,16 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       const settlementRef = doc(db, 'groupSettlements', settlementId);
+
+      // Filter out undefined values
+      const cleanSettlementData = Object.fromEntries(
+        Object.entries(settlementData).filter(
+          ([, value]) => value !== undefined
+        )
+      );
+
       await updateDoc(settlementRef, {
-        ...settlementData,
+        ...cleanSettlementData,
         updatedAt: Date.now(),
       });
 
@@ -888,6 +954,7 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Expenses
     getGroupExpenses,
+    getExpenseById,
     addExpenseToGroup,
     updateExpense,
     deleteExpense,

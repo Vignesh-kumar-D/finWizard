@@ -6,7 +6,7 @@ import { FirebaseProvider } from '@/lib/firebase/firebase-context';
 import { AccountProvider } from '@/lib/firebase/account-context';
 import { BudgetProvider } from '@/lib/firebase/budget-context';
 import { TransactionProvider } from '@/lib/firebase/transaction-context';
-import { GroupProvider } from '@/lib/firebase/group-context';
+import { GroupProvider } from '@/lib/firebase/group-context-scalable';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',

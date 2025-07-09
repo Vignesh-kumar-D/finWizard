@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/lib/firebase/firebase-context';
-import { useGroups } from '@/lib/firebase/group-context';
+import { useGroups } from '@/lib/firebase/group-context-scalable';
 import { serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
@@ -83,8 +83,6 @@ export default function CreateGroupPage() {
           },
           ...members,
         ],
-        expenses: [],
-        settlements: [],
       };
 
       const groupId = await createGroup(groupData as Group);
