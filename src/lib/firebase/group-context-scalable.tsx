@@ -276,12 +276,19 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // Create the group (without expenses/settlements arrays)
+      // Ensure all member timestamps are regular numbers, not serverTimestamp()
+      const membersWithRegularTimestamps = groupData.members.map((member) => ({
+        ...member,
+        joinedAt:
+          typeof member.joinedAt === 'number' ? member.joinedAt : Date.now(),
+      }));
+
       const docRef = await addDoc(collection(db, 'groups'), {
         name: groupData.name,
         createdBy: currentUser.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        members: groupData.members,
+        members: membersWithRegularTimestamps,
       });
 
       // Refresh the groups list
@@ -782,9 +789,18 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
+      // Ensure joinedAt is a regular number, not serverTimestamp()
+      const memberWithRegularTimestamp = {
+        ...memberData,
+        joinedAt:
+          typeof memberData.joinedAt === 'number'
+            ? memberData.joinedAt
+            : Date.now(),
+      };
+
       const groupRef = doc(db, 'groups', groupId);
       await updateDoc(groupRef, {
-        members: arrayUnion(memberData),
+        members: arrayUnion(memberWithRegularTimestamp),
         updatedAt: serverTimestamp(),
       });
 
