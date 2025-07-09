@@ -29,6 +29,12 @@ import { ArrowLeft, Users, Receipt, Equal, Percent, Hash } from 'lucide-react';
 import { toast } from 'sonner';
 import { Group, SharedExpense, ExpenseSplit } from '@/types';
 import { formatCurrency } from '@/lib/format';
+import {
+  calculateExpenseSplits,
+  validateSplits,
+  getSplitSummary,
+  type SplitOptions,
+} from '@/lib/utils';
 
 type SplitType = 'equal' | 'percentage' | 'custom';
 
@@ -112,34 +118,57 @@ export default function CreateGroupExpensePage() {
       const includedMembers = prevOptions.filter((option) => option.isIncluded);
       if (includedMembers.length === 0) return prevOptions;
 
+      // Prepare data for the new splitting utility
+      const participants = includedMembers.map((member) => ({
+        userId: member.userId,
+        name: member.name,
+        email: member.email,
+      }));
+
+      const customAmounts: Record<string, number> = {};
+      const customPercentages: Record<string, number> = {};
+
+      // Collect existing custom values
+      includedMembers.forEach((member) => {
+        if (splitType === 'custom') {
+          customAmounts[member.userId] = member.amount;
+        } else if (splitType === 'percentage') {
+          customPercentages[member.userId] = member.percentage;
+        }
+      });
+
+      // Calculate splits using the new utility
+      const splitOptions: SplitOptions = {
+        totalAmount,
+        participants,
+        splitType,
+        customAmounts: splitType === 'custom' ? customAmounts : undefined,
+        customPercentages:
+          splitType === 'percentage' ? customPercentages : undefined,
+        precision: 2,
+        roundingStrategy: 'distribute',
+      };
+
+      const calculatedSplits = calculateExpenseSplits(splitOptions);
+
+      // Update split options with calculated results
       return prevOptions.map((option) => {
         if (!option.isIncluded) {
           return { ...option, amount: 0, percentage: 0 };
         }
 
-        let newAmount = 0;
-        let newPercentage = 0;
-
-        switch (splitType) {
-          case 'equal':
-            newAmount = totalAmount / includedMembers.length;
-            newPercentage = (newAmount / totalAmount) * 100;
-            break;
-          case 'percentage':
-            // Keep existing percentage, recalculate amount
-            newAmount = (option.percentage / 100) * totalAmount;
-            break;
-          case 'custom':
-            // Keep existing amount, recalculate percentage
-            newPercentage = (option.amount / totalAmount) * 100;
-            break;
+        const calculatedSplit = calculatedSplits.find(
+          (split) => split.userId === option.userId
+        );
+        if (calculatedSplit) {
+          return {
+            ...option,
+            amount: calculatedSplit.amount,
+            percentage: calculatedSplit.percentage,
+          };
         }
 
-        return {
-          ...option,
-          amount: Math.round(newAmount * 100) / 100, // Round to 2 decimal places
-          percentage: Math.round(newPercentage * 100) / 100,
-        };
+        return option;
       });
     });
   }, [amount, splitType, group]);
@@ -148,24 +177,49 @@ export default function CreateGroupExpensePage() {
     setSplitType(type);
 
     if (type === 'equal') {
-      // Reset all amounts and percentages for equal split
+      // Reset all amounts and percentages for equal split using new utility
       const totalAmount = parseFloat(amount) || 0;
       const includedMembers = splitOptions.filter(
         (option) => option.isIncluded
       );
 
       if (includedMembers.length > 0) {
-        const equalAmount = totalAmount / includedMembers.length;
-        const equalPercentage = (equalAmount / totalAmount) * 100;
+        const participants = includedMembers.map((member) => ({
+          userId: member.userId,
+          name: member.name,
+          email: member.email,
+        }));
+
+        const splitOptionsConfig: SplitOptions = {
+          totalAmount,
+          participants,
+          splitType: 'equal',
+          precision: 2,
+          roundingStrategy: 'distribute',
+        };
+
+        const calculatedSplits = calculateExpenseSplits(splitOptionsConfig);
 
         setSplitOptions(
-          splitOptions.map((option) => ({
-            ...option,
-            amount: option.isIncluded ? Math.round(equalAmount * 100) / 100 : 0,
-            percentage: option.isIncluded
-              ? Math.round(equalPercentage * 100) / 100
-              : 0,
-          }))
+          splitOptions.map((option) => {
+            if (!option.isIncluded) {
+              return { ...option, amount: 0, percentage: 0 };
+            }
+
+            const calculatedSplit = calculatedSplits.find(
+              (split) => split.userId === option.userId
+            );
+
+            if (calculatedSplit) {
+              return {
+                ...option,
+                amount: calculatedSplit.amount,
+                percentage: calculatedSplit.percentage,
+              };
+            }
+
+            return option;
+          })
         );
       }
     }
@@ -247,13 +301,22 @@ export default function CreateGroupExpensePage() {
     }
 
     const totalAmount = parseFloat(amount);
-    const totalSplit = includedMembers.reduce(
-      (sum, option) => sum + option.amount,
-      0
-    );
 
-    if (Math.abs(totalSplit - totalAmount) > 0.01) {
-      toast.error('Split amounts must equal the total amount');
+    // Use the new validation utility
+    const splits = includedMembers.map((member) => ({
+      userId: member.userId,
+      amount: member.amount,
+      percentage: member.percentage,
+      isAdjusted: false,
+    }));
+
+    if (!validateSplits(splits, totalAmount)) {
+      const summary = getSplitSummary(splits, totalAmount);
+      toast.error(
+        `Split amounts don't match total. Difference: ${formatCurrency(
+          summary.difference
+        )}`
+      );
       return false;
     }
 
