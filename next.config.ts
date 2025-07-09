@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
       'localhost',
       'firebasestorage.googleapis.com',
     ],
+    unoptimized: true,
     remotePatterns,
   },
 };

@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useGroups } from '@/lib/firebase/group-context';
+import { useGroups } from '@/lib/firebase/group-context-scalable';
 import { Button } from '@/components/ui/button';
 import {
   Card,

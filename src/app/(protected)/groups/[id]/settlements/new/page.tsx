@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useFirebase } from '@/lib/firebase/firebase-context';
-import { useGroups } from '@/lib/firebase/group-context';
+import { useGroups } from '@/lib/firebase/group-context-scalable';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -100,10 +100,10 @@ export default function CreateSettlementPage() {
         amount: parseFloat(amount),
         date: new Date(date).getTime(),
         relatedExpenseIds: [], // Can be enhanced to link to specific expenses
-        notes: notes.trim() || undefined,
+        notes: notes.trim() || '',
       };
 
-      await addSettlementToGroup(groupId, settlementData as Settlement);
+      await addSettlementToGroup(groupId, settlementData);
       toast.success('Settlement added successfully!');
       router.push(`/groups/${groupId}`);
     } catch (error) {

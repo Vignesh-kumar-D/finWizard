@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useFirebase } from '@/lib/firebase/firebase-context';
-import { useGroups } from '@/lib/firebase/group-context';
+import { useGroups } from '@/lib/firebase/group-context-scalable';
 import { Button } from '@/components/ui/button';
 import {
   Card,
