@@ -77,6 +77,14 @@
 				<string>com.finWizard.zeno</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>GoogleSignIn</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.208205465650-culno2tvja70rffga7889q1gm8a8udej</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

@@ -165,6 +165,14 @@ export default function AuthPage() {
         router.push('/dashboard');
       }
     } catch (error) {
+      // Don't show error for redirect cases
+      if (error instanceof Error && error.message === 'Redirect initiated') {
+        toast.info('Redirecting to Google...', {
+          description: 'Please complete the sign-in process in the new window.',
+        });
+        return;
+      }
+
       toast.error('Login failed', {
         description:
           error instanceof Error
