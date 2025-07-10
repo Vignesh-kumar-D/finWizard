@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'zeno',
   webDir: 'public',
   server: {
-    url: 'http://192.168.1.100:3000',
+    url: 'http://192.168.0.101:3000',
     cleartext: true,
   },
 };
