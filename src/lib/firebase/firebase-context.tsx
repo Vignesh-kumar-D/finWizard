@@ -10,12 +10,9 @@ import {
   initPhoneAuth,
   verifyOtpAndSignIn,
   getCurrentUserProfile,
+  handleRedirectResult,
 } from './utils/auth';
-import {
-  updateUserProfile,
-  isProfileComplete,
-  createUserProfile,
-} from './utils/user';
+import { updateUserProfile, isProfileComplete } from './utils/user';
 import { UserProfile } from '@/types';
 
 interface FirebaseContextType {
@@ -88,11 +85,37 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => unsubscribe();
   }, []);
 
+  // Handle redirect results when the app loads
+  useEffect(() => {
+    const checkRedirectResult = async () => {
+      try {
+        const result = await handleRedirectResult();
+        if (result) {
+          setUserProfile(result.userProfile);
+          setProfileCompleteStatus(isProfileComplete(result.userProfile));
+        }
+      } catch (error) {
+        console.error('Error handling redirect result:', error);
+      }
+    };
+
+    checkRedirectResult();
+  }, []);
+
   const loginWithGoogle = async () => {
-    const result = await signInWithGoogle();
-    setUserProfile(result.userProfile);
-    setProfileCompleteStatus(isProfileComplete(result.userProfile));
-    return result;
+    try {
+      const result = await signInWithGoogle();
+      setUserProfile(result.userProfile);
+      setProfileCompleteStatus(isProfileComplete(result.userProfile));
+      return result;
+    } catch (error) {
+      // If it's a redirect error, we don't need to handle it here
+      // as it will be handled by the redirect result handler
+      if (error instanceof Error && error.message === 'Redirect initiated') {
+        throw error;
+      }
+      throw error;
+    }
   };
 
   const logout = async () => {
@@ -117,65 +140,20 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const updateProfile = async (data: Partial<UserProfile>) => {
-    if (!currentUser) throw new Error('No user logged in');
+    if (!currentUser) {
+      throw new Error('No user logged in');
+    }
 
-    try {
-      const uid = currentUser.uid;
+    await updateUserProfile(currentUser.uid, data);
 
-      // If no userProfile exists, we need to create one first
-      if (!userProfile) {
-        // Create a base profile with required fields
-        const newProfile: Omit<UserProfile, 'id'> = {
-          name: data.name || '',
-          email: data.email || currentUser.email || '',
-          phoneNumber: data.phoneNumber || currentUser.phoneNumber || '',
-          createdAt: Date.now(),
-          lastActive: Date.now(),
-          photoURL: data.photoURL || currentUser.photoURL || '',
-          authMethods: [
-            {
-              authMethod: currentUser.providerData[0]?.providerId.includes(
-                'google'
-              )
-                ? 'google'
-                : 'phone',
-              uid: currentUser.uid,
-              linkedAt: Date.now(),
-            },
-          ],
-        };
-
-        // Merge with any updates from the form
-        const mergedProfile = { ...newProfile, ...data };
-
-        // Create user profile in Firestore
-        const createdProfile = await createUserProfile(uid, mergedProfile);
-
-        // Update local state
-        setUserProfile(createdProfile);
-        setProfileCompleteStatus(isProfileComplete(createdProfile));
-      } else {
-        // Update existing profile
-        await updateUserProfile(uid, data);
-
-        // Create updated profile object
-        const updatedProfile = {
-          ...userProfile,
-          ...data,
-          lastActive: Date.now(),
-        };
-
-        // Update local state
-        setUserProfile(updatedProfile);
-
-        // Re-evaluate if profile is complete
-        setProfileCompleteStatus(isProfileComplete(updatedProfile));
-      }
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      throw error;
+    // Update local state
+    if (userProfile) {
+      const updatedProfile = { ...userProfile, ...data };
+      setUserProfile(updatedProfile);
+      setProfileCompleteStatus(isProfileComplete(updatedProfile));
     }
   };
+
   const value = {
     currentUser,
     userProfile,

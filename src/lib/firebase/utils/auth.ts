@@ -1,6 +1,8 @@
 // utils/auth.ts
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   GoogleAuthProvider,
   PhoneAuthProvider,
@@ -26,86 +28,135 @@ export const signInWithGoogle = async (): Promise<{
 }> => {
   try {
     const provider = new GoogleAuthProvider();
-    const userCredential = await signInWithPopup(auth, provider);
-    const user = userCredential.user;
 
-    // Check if we already have a user with this email
-    let existingUser = null;
-    let isNewUser = false;
-
-    if (user.email) {
-      existingUser = await findUserByEmail(user.email);
+    // Try popup first, fall back to redirect if blocked
+    try {
+      const userCredential = await signInWithPopup(auth, provider);
+      const user = userCredential.user;
+      return await processGoogleSignInResult(user);
+    } catch (popupError: unknown) {
+      // If popup is blocked, use redirect
+      if (
+        popupError &&
+        typeof popupError === 'object' &&
+        'code' in popupError &&
+        (popupError.code === 'auth/popup-blocked' ||
+          popupError.code === 'auth/popup-closed-by-user')
+      ) {
+        await signInWithRedirect(auth, provider);
+        // The redirect will happen, so we return a promise that will be resolved after redirect
+        return new Promise((resolve, reject) => {
+          // This will be handled by getRedirectResult when the page loads after redirect
+          reject(new Error('Redirect initiated'));
+        });
+      }
+      throw popupError;
     }
-
-    // If user exists with this email, update with Google auth info
-    if (existingUser) {
-      // Update the user's last active timestamp
-      // Get current auth methods
-      const currentAuthMethods = existingUser.authMethods || [];
-
-      // Check if this Google auth method already exists
-      const hasGoogleMethod = currentAuthMethods.some(
-        (method) => method.authMethod === 'google' && method.uid === user.uid
-      );
-
-      // Only add if it doesn't exist
-      const updatedAuthMethods = hasGoogleMethod
-        ? currentAuthMethods
-        : [
-            ...currentAuthMethods,
-            {
-              authMethod: 'google',
-              uid: user.uid,
-              linkedAt: Date.now(),
-            },
-          ];
-
-      // Update the user's profile
-      await setDoc(
-        doc(db, 'users', existingUser.id),
-        {
-          lastActive: Date.now(),
-          authMethods: updatedAuthMethods,
-        },
-        { merge: true }
-      );
-
-      return {
-        user,
-        userProfile: {
-          ...existingUser,
-          lastActive: Date.now(),
-        },
-        isNewUser: false,
-      };
-    }
-
-    // Check if we already have a user document with this uid
-    const userRef = doc(db, 'users', user.uid);
-    const userDoc = await getDoc(userRef);
-
-    if (userDoc.exists()) {
-      // User document exists with this UID
-      const userProfile = {
-        id: userDoc.id,
-        ...userDoc.data(),
-      } as UserProfile;
-
-      // Update last active timestamp
-      await setDoc(userRef, { lastActive: Date.now() }, { merge: true });
-
-      return { user, userProfile, isNewUser: false };
-    }
-
-    // This is a new user, create a profile
-    isNewUser = true;
-    const userData = mergeUserDataFromAuth(user);
-
-    const newUserProfile = await createUserProfile(user.uid, userData);
-
-    return { user, userProfile: newUserProfile, isNewUser };
   } catch (error) {
     console.error('Error signing in with Google:', error);
+    throw error;
+  }
+};
+
+// Process Google sign-in result (used by both popup and redirect)
+export const processGoogleSignInResult = async (
+  user: User
+): Promise<{
+  user: User;
+  userProfile: UserProfile;
+  isNewUser: boolean;
+}> => {
+  // Check if we already have a user with this email
+  let existingUser = null;
+  let isNewUser = false;
+
+  if (user.email) {
+    existingUser = await findUserByEmail(user.email);
+  }
+
+  // If user exists with this email, update with Google auth info
+  if (existingUser) {
+    // Update the user's last active timestamp
+    // Get current auth methods
+    const currentAuthMethods = existingUser.authMethods || [];
+
+    // Check if this Google auth method already exists
+    const hasGoogleMethod = currentAuthMethods.some(
+      (method) => method.authMethod === 'google' && method.uid === user.uid
+    );
+
+    // Only add if it doesn't exist
+    const updatedAuthMethods = hasGoogleMethod
+      ? currentAuthMethods
+      : [
+          ...currentAuthMethods,
+          {
+            authMethod: 'google',
+            uid: user.uid,
+            linkedAt: Date.now(),
+          },
+        ];
+
+    // Update the user's profile
+    await setDoc(
+      doc(db, 'users', existingUser.id),
+      {
+        lastActive: Date.now(),
+        authMethods: updatedAuthMethods,
+      },
+      { merge: true }
+    );
+
+    return {
+      user,
+      userProfile: {
+        ...existingUser,
+        lastActive: Date.now(),
+      },
+      isNewUser: false,
+    };
+  }
+
+  // Check if we already have a user document with this uid
+  const userRef = doc(db, 'users', user.uid);
+  const userDoc = await getDoc(userRef);
+
+  if (userDoc.exists()) {
+    // User document exists with this UID
+    const userProfile = {
+      id: userDoc.id,
+      ...userDoc.data(),
+    } as UserProfile;
+
+    // Update last active timestamp
+    await setDoc(userRef, { lastActive: Date.now() }, { merge: true });
+
+    return { user, userProfile, isNewUser: false };
+  }
+
+  // This is a new user, create a profile
+  isNewUser = true;
+  const userData = mergeUserDataFromAuth(user);
+
+  const newUserProfile = await createUserProfile(user.uid, userData);
+
+  return { user, userProfile: newUserProfile, isNewUser };
+};
+
+// Handle redirect result (call this when the app loads after a redirect)
+export const handleRedirectResult = async (): Promise<{
+  user: User;
+  userProfile: UserProfile;
+  isNewUser: boolean;
+} | null> => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result) {
+      return await processGoogleSignInResult(result.user);
+    }
+    return null;
+  } catch (error) {
+    console.error('Error handling redirect result:', error);
     throw error;
   }
 };
