@@ -1,5 +1,6 @@
-# Zeno - Personal Finance Manager
 
+# Zeno - Personal Finance Manager
+<img width="1179" height="645" alt="Screenshot 2025-08-31 at 4 06 20 PM" src="https://github.com/user-attachments/assets/c0d3431f-bc7d-4f3d-aa10-2c7b385eb172" />
 A comprehensive personal finance management application built with Next.js, Firebase, and TypeScript. Track your expenses, manage budgets, handle group expenses, and gain insights into your financial health.
 
 ## 🚀 Features
